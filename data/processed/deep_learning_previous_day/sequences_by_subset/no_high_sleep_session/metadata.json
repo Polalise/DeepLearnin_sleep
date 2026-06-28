@@ -1,0 +1,15 @@
+{
+  "subset_name": "no_high_sleep_session",
+  "feature_count": 127,
+  "windows": [
+    7,
+    14,
+    30
+  ],
+  "target_col": "good_sleep_label",
+  "id_col": "participant_object_id",
+  "date_col": "calendar_date",
+  "split_col": "deep_learning_split",
+  "source_data": "c:\\workSpace\\DeepLearnin_sleep\\data\\processed\\deep_learning_previous_day\\modeling_dataset_previous_day_encoded.csv",
+  "feature_policy": "target_date uses features from target_date_minus_1"
+}

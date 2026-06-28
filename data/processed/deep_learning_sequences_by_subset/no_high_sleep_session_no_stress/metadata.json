@@ -1,0 +1,15 @@
+{
+  "subset_name": "no_high_sleep_session_no_stress",
+  "feature_count": 115,
+  "windows": [
+    7,
+    14,
+    30
+  ],
+  "target_col": "good_sleep_label",
+  "id_col": "participant_object_id",
+  "date_col": "calendar_date",
+  "split_col": "deep_learning_split",
+  "source_data": "c:\\workSpace\\DeepLearnin_sleep\\data\\processed\\modeling_dataset_encoded.csv",
+  "source_split": "c:\\workSpace\\DeepLearnin_sleep\\data\\processed\\deep_learning_sequences\\deep_learning_participant_split_assignments.csv"
+}

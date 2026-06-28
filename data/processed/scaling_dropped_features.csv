@@ -1,0 +1,11 @@
+﻿feature,reason
+mood_anger_count,zero_variance
+mood_fear_count,zero_variance
+mood_joy_count,zero_variance
+mood_sadness_count,zero_variance
+mood_surprise_count,zero_variance
+mood_anger_rate,zero_variance
+mood_fear_rate,zero_variance
+mood_joy_rate,zero_variance
+mood_sadness_rate,zero_variance
+mood_surprise_rate,zero_variance

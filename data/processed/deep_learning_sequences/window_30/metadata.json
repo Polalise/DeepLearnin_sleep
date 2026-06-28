@@ -1,0 +1,15 @@
+{
+  "window": 30,
+  "created_at": "2026-06-29T00:12:41",
+  "input_path": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\modeling_dataset_encoded.csv",
+  "feature_columns_path": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\encoded_feature_columns.csv",
+  "split_assignments_path": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\splits\\participant_split_assignments.csv",
+  "require_contiguous_dates": true,
+  "feature_count": 197,
+  "sample_index_path": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\deep_learning_sequences\\window_30\\sample_index.csv",
+  "tensor_files": {
+    "train": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\deep_learning_sequences\\window_30\\train.npz",
+    "validation": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\deep_learning_sequences\\window_30\\validation.npz",
+    "test": "C:\\workSpace\\DeepLearnin_sleep\\data\\processed\\deep_learning_sequences\\window_30\\test.npz"
+  }
+}

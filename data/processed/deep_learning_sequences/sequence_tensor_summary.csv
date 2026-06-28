@@ -1,0 +1,10 @@
+﻿window,split,samples,participants,features,sequence_shape,mlp_flattened_shape,mlp_current_day_shape,class_0_samples,class_1_samples,good_sleep_label_mean,tensor_path
+7,test,314,9,197,314 x 7 x 197,314 x 1379,314 x 197,182,132,0.42038216560509556,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_7\test.npz
+7,train,1393,35,197,1393 x 7 x 197,1393 x 1379,1393 x 197,831,562,0.40344580043072503,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_7\train.npz
+7,validation,269,9,197,269 x 7 x 197,269 x 1379,269 x 197,163,106,0.3940520446096654,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_7\validation.npz
+14,test,214,5,197,214 x 14 x 197,214 x 2758,214 x 197,116,98,0.45794392523364486,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_14\test.npz
+14,train,933,27,197,933 x 14 x 197,933 x 2758,933 x 197,576,357,0.38263665594855306,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_14\train.npz
+14,validation,146,7,197,146 x 14 x 197,146 x 2758,146 x 197,95,51,0.3493150684931507,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_14\validation.npz
+30,test,106,4,197,106 x 30 x 197,106 x 5910,106 x 197,43,63,0.5943396226415094,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_30\test.npz
+30,train,435,19,197,435 x 30 x 197,435 x 5910,435 x 197,287,148,0.34022988505747126,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_30\train.npz
+30,validation,55,3,197,55 x 30 x 197,55 x 5910,55 x 197,42,13,0.23636363636363636,C:\workSpace\DeepLearnin_sleep\data\processed\deep_learning_sequences\window_30\validation.npz

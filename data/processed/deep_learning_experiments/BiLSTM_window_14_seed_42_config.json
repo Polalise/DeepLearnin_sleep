@@ -1,0 +1,13 @@
+{
+  "model_name": "BiLSTM",
+  "window": 14,
+  "max_epochs": 40,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "weight_decay": 0.0001,
+  "patience": 6,
+  "seed": 42,
+  "model_input": "sequence",
+  "best_epoch": 19,
+  "best_validation_loss": 0.5624168316523234
+}
