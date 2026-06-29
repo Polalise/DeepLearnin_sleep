@@ -187,6 +187,14 @@ Inference package QA report:
 reports/pre_sleep_inference_package_qa.md
 ```
 
+Follow-up plans:
+
+```text
+reports/pre_sleep_sequence_model_followup_plan.md
+reports/pre_sleep_calibration_followup_plan.md
+reports/pre_sleep_external_future_validation_plan.md
+```
+
 This artifact inventory:
 
 ```text
@@ -211,6 +219,12 @@ Daily work log:
 
 ```text
 log/2026-06-29.md
+```
+
+Inference dependency list:
+
+```text
+requirements-inference.txt
 ```
 
 Main pipeline summary notebook:

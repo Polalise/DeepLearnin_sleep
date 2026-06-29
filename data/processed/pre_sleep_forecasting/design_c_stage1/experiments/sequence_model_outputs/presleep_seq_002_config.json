@@ -1,0 +1,33 @@
+{
+  "experiment_id": "presleep_seq_002",
+  "seed": 2027,
+  "device": "cpu",
+  "config": {
+    "experiment_id": "presleep_seq_002",
+    "objective": "strict_pre_sleep_forecasting",
+    "feature_set": "design_c_stage1_sequence_58_features",
+    "model_family": "gru",
+    "window": 7,
+    "input_dim": 58,
+    "hidden_dim": 16,
+    "num_layers": 1,
+    "bidirectional": false,
+    "dropout": 0.4,
+    "weight_decay": 0.001,
+    "learning_rate": 0.0008,
+    "batch_size": 32,
+    "max_epochs": 80,
+    "patience": 12,
+    "selection_metric": "validation_balanced_accuracy",
+    "threshold_policy": "validation_balanced_accuracy",
+    "train_samples": 2073,
+    "validation_samples": 296,
+    "test_samples": 797,
+    "train_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage1\\sequence_tensors\\window_7\\train.npz",
+    "validation_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage1\\sequence_tensors\\window_7\\validation.npz",
+    "test_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage1\\sequence_tensors\\window_7\\test.npz"
+  },
+  "best_epoch": 20,
+  "selected_threshold": 0.34,
+  "elapsed_seconds": 46.83222675323486
+}

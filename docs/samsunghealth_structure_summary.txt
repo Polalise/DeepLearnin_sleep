@@ -1,0 +1,73 @@
+Samsung Health 데이터 구조 요약
+==================================
+원본 ZIP: samsunghealth.zip
+CSV 파일 수: 80개
+총 레코드 수(각 CSV 행 합계): 256,910행
+
+공통 CSV 구조
+- 1행: 데이터셋명, Samsung Health 스키마/버전 메타정보
+- 2행: 컬럼명
+- 3행부터: 실제 데이터
+- datauuid/deviceuuid/client_data_id 계열은 식별자이며, 여러 테이블 연결 또는 출처 구분에 사용됩니다.
+- *_data, binning_data, live_data, location_data 계열은 상세 JSON/내부 데이터/파일 참조 성격입니다.
+
+카테고리별 파일 수/행 수
+- 건강기록/PHR: 3개 파일, 253행
+- 기기/설정: 5개 파일, 164행
+- 기타: 3개 파일, 17,021행
+- 목표/리포트/소셜: 13개 파일, 1,523행
+- 수면: 9개 파일, 102,653행
+- 신체/프로필: 4개 파일, 84행
+- 심혈관/바이탈: 14개 파일, 92,829행
+- 영양/섭취: 8개 파일, 1,570행
+- 활동/운동: 21개 파일, 40,813행
+
+행 수가 많은 주요 파일
+- com.samsung.health.sleep_stage.20260629163038.csv: 92,744행, 13컬럼, 분류=수면
+  주요 지표: stage
+  기간: start_time: 2021-07-29~2026-06-27; update_time: 2021-07-29~2026-06-27; create_time: 2021-07-29~2026-06-27; end_time: 2021-07-29~2026-06-27
+- com.samsung.shealth.tracker.heart_rate.20260629163038.csv: 86,140행, 21컬럼, 분류=심혈관/바이탈
+  주요 지표: heart_rate
+  기간: start_time: 2018-04-25~2026-06-29; update_time: 2018-04-25~2026-06-29; create_time: 2018-04-25~2026-06-29; end_time: 2018-04-25~2026-06-29
+- com.samsung.shealth.hsp.references.20260629163038.csv: 17,014행, 8컬럼, 분류=기타
+  기간: update_time: 2025-01-31~2026-06-29; create_time: 2025-01-31~2026-06-29
+- com.samsung.shealth.tracker.pedometer_step_count.20260629163038.csv: 7,237행, 18컬럼, 분류=활동/운동
+  주요 지표: duration
+- com.samsung.shealth.sleep_snoring.20260629163038.csv: 7,186행, 12컬럼, 분류=수면
+  주요 지표: duration
+  기간: start_time: 1970-01-01~2026-06-27; update_time: 2021-12-22~2026-06-27; create_time: 2021-12-22~2026-06-27; end_time: 2021-12-22~2026-06-27
+- com.samsung.shealth.step_daily_trend.20260629163038.csv: 6,658행, 13컬럼, 분류=활동/운동
+  주요 지표: calorie, distance
+  기간: update_time: 2025-08-01~2026-06-29; create_time: 2025-08-01~2026-06-28; day_time: 2018-04-23~2026-06-29
+- com.samsung.shealth.tracker.pedometer_day_summary.20260629163038.csv: 6,658행, 21컬럼, 분류=활동/운동
+  주요 지표: active_time, calorie, distance, step_count
+  기간: update_time: 2018-04-23~2026-06-29; create_time: 2018-04-22~2026-06-28; day_time: 2018-04-23~2026-06-29
+- com.samsung.health.movement.20260629163038.csv: 6,655행, 13컬럼, 분류=활동/운동
+  기간: start_time: 2024-12-10~2026-06-29; update_time: 2024-12-10~2026-06-29; create_time: 2024-12-10~2026-06-29; end_time: 2024-12-10~2026-06-29
+- com.samsung.health.floors_climbed.20260629163038.csv: 3,737행, 13컬럼, 분류=활동/운동
+  기간: start_time: 2021-12-22~2026-06-28; update_time: 2021-12-22~2026-06-28; create_time: 2021-12-22~2026-06-28; end_time: 2021-12-22~2026-06-28
+- com.samsung.shealth.calories_burned.details.20260629163038.csv: 3,088행, 17컬럼, 분류=활동/운동
+- com.samsung.shealth.activity.day_summary.20260629163038.csv: 3,087행, 33컬럼, 분류=활동/운동
+  주요 지표: active_time, calorie, distance, floor_count, score, step_count
+  기간: update_time: 2017-12-03~2026-06-29; create_time: 2017-12-03~2026-06-28; day_time: 2017-11-07~2026-06-29
+- com.samsung.health.hrv.20260629163038.csv: 2,880행, 13컬럼, 분류=심혈관/바이탈
+  기간: start_time: 2024-12-10~2026-06-27; update_time: 2024-12-10~2026-06-27; create_time: 2024-12-10~2026-06-27; end_time: 2024-12-10~2026-06-27
+
+주요 테이블 관계
+- pedometer_day_summary: 하루 단위 걸음 수 요약. binning_data/source_info/achievement 컬럼으로 상세 구간/출처/목표 정보를 참조합니다.
+- tracker.pedometer_step_count: 더 세밀한 걸음 수 변화 기록으로 day_summary와 날짜/시간 기준으로 함께 분석할 수 있습니다.
+- sleep / sleep_combined: 수면 세션 단위 요약. sleep_stage는 sleep_id 기준으로 수면 단계 구간을 연결합니다.
+- tracker.heart_rate: 심박 구간 기록. start_time/end_time 기준으로 운동, 수면, 스트레스 데이터와 시간대 결합이 가능합니다.
+- exercise: 운동 1회가 1행인 세션 테이블. location_data/live_data 계열 컬럼으로 운동 중 상세 시계열 또는 위치 데이터를 참조합니다.
+- nutrition / food_intake / food_info: 섭취 기록과 음식 영양 정보 테이블입니다. food_info_id/provider_food_id 계열로 연결될 수 있습니다.
+
+분석용으로 우선 볼 핵심 파일
+- 활동/걸음: com.samsung.shealth.tracker.pedometer_day_summary, com.samsung.shealth.tracker.pedometer_step_count, com.samsung.shealth.activity.day_summary
+- 운동: com.samsung.shealth.exercise
+- 심박/스트레스: com.samsung.shealth.tracker.heart_rate, com.samsung.shealth.stress, com.samsung.health.hrv
+- 수면: com.samsung.shealth.sleep, com.samsung.shealth.sleep_combined, com.samsung.health.sleep_stage
+- 신체: com.samsung.health.weight, com.samsung.health.height, com.samsung.health.user_profile
+
+생성된 보조 파일
+- samsunghealth_file_catalog.csv: 파일 단위 구조 요약
+- samsunghealth_column_dictionary.csv: 모든 CSV 컬럼의 타입/단위/의미 사전

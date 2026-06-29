@@ -147,6 +147,12 @@ cd C:\workSpace\DeepLearnin_sleep
 
 기본 시스템 Python에는 `torch`, `pymongo`, `bson`이 없을 수 있으므로, 이 프로젝트의 `.venv` 사용을 권장합니다.
 
+Inference 전용 의존성 목록은 아래 파일에 정리되어 있습니다.
+
+```text
+requirements-inference.txt
+```
+
 ## 1단계. 예측할 Episode 입력 CSV 만들기
 
 예시 경로:

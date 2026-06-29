@@ -1,0 +1,10 @@
+﻿window,split,samples,participants,time_steps,features,path
+3,train,2234,41,3,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_3\train.npz
+3,validation,329,9,3,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_3\validation.npz
+3,test,853,14,3,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_3\test.npz
+5,train,2153,40,5,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\train.npz
+5,validation,312,8,5,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\validation.npz
+5,test,825,14,5,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\test.npz
+7,train,2073,39,7,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_7\train.npz
+7,validation,296,8,7,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_7\validation.npz
+7,test,797,14,7,58,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_7\test.npz

@@ -1,0 +1,22 @@
+﻿dataset_key,dataset_name,column,parsed_count,min,max
+sleep,com.samsung.shealth.sleep,original_bed_time,354,1970-01-01 00:00:00.082800,1970-01-01 00:00:00.082800
+sleep,com.samsung.shealth.sleep,original_wake_up_time,1640,1970-01-01 00:00:00,1970-01-01 00:00:00.000000100
+sleep_combined,com.samsung.shealth.sleep_combined,start_time,48,1970-01-01 00:00:00,1970-01-01 00:00:00.000000099
+sleep_combined,com.samsung.shealth.sleep_combined,end_time,0,,
+sleep_combined,com.samsung.shealth.sleep_combined,create_time,0,,
+sleep_combined,com.samsung.shealth.sleep_combined,update_time,7,1970-01-01 00:00:00,1970-01-01 00:00:00
+sleep_combined,com.samsung.shealth.sleep_combined,original_bed_time,23,1970-01-01 00:00:00.001800,1970-01-01 00:00:00.082800
+sleep_combined,com.samsung.shealth.sleep_combined,original_wake_up_time,0,,
+sleep_stage,com.samsung.health.sleep_stage,start_time,0,,
+sleep_stage,com.samsung.health.sleep_stage,end_time,0,,
+sleep_stage,com.samsung.health.sleep_stage,create_time,92744,1970-01-01 00:00:00.000040001,1970-01-01 00:00:00.000040004
+sleep_stage,com.samsung.health.sleep_stage,update_time,92744,2021-07-29 18:44:14,2026-06-27 02:11:11.563000
+pedometer_day_summary,com.samsung.shealth.tracker.pedometer_day_summary,day_time,0,,
+pedometer_day_summary,com.samsung.shealth.tracker.pedometer_day_summary,create_time,0,,
+pedometer_day_summary,com.samsung.shealth.tracker.pedometer_day_summary,update_time,0,,
+activity_day_summary,com.samsung.shealth.activity.day_summary,day_time,0,,
+activity_day_summary,com.samsung.shealth.activity.day_summary,create_time,943,1970-01-01 00:00:00,1970-01-01 00:00:00.000000070
+activity_day_summary,com.samsung.shealth.activity.day_summary,update_time,943,1970-01-01 00:00:00.000000010,1970-01-01 00:00:00.000000010
+step_daily_trend,com.samsung.shealth.step_daily_trend,day_time,0,,
+step_daily_trend,com.samsung.shealth.step_daily_trend,create_time,0,,
+step_daily_trend,com.samsung.shealth.step_daily_trend,update_time,6658,2025-08-01 11:26:10.094000,2026-06-28 15:33:51.907000

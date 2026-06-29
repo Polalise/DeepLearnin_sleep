@@ -1,0 +1,13 @@
+# Inference-only dependencies for the strict pre-sleep forecasting package.
+#
+# Install inside a Python 3.10+ environment before running:
+#   src/pre_sleep_forecasting/feature_builder.py
+#   src/pre_sleep_forecasting/inference.py
+#   scripts/24_check_pre_sleep_inference_package.py
+
+numpy
+pandas
+scikit-learn
+joblib
+pymongo
+torch

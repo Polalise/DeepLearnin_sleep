@@ -202,10 +202,17 @@ The current package is suitable as a research-grade inference prototype.
 
 ## 9. Remaining Optional Work
 
-Optional next steps:
+Optional next steps now have planning documents:
 
-- Verify `notebooks/02_pipeline_from_scripts_summary.ipynb` after the final reporting structure is fixed.
-- Explore strict pre-sleep sequence models as follow-up experiments.
-- Try calibration correction, while noting the small validation participant count and overfitting risk.
-- Validate on external or future-period data.
-- Create a minimal dependency file for inference-only reuse, such as `requirements-inference.txt`.
+- Strict pre-sleep sequence models:
+  - `reports/pre_sleep_sequence_model_followup_plan.md`
+- Calibration correction:
+  - `reports/pre_sleep_calibration_followup_plan.md`
+- External or future-period validation:
+  - `reports/pre_sleep_external_future_validation_plan.md`
+
+The inference dependency reference is:
+
+```text
+requirements-inference.txt
+```

@@ -1,0 +1,19 @@
+﻿experiment_id,split,path,X_shape,y_shape,participants,positive_rate
+presleep_seq_000,train,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_3\train.npz,"(2234, 3, 58)","(2234,)",41,0.41360787824529993
+presleep_seq_000,validation,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_3\validation.npz,"(329, 3, 58)","(329,)",9,0.3586626139817629
+presleep_seq_000,test,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_3\test.npz,"(853, 3, 58)","(853,)",14,0.3645955451348183
+presleep_seq_001,train,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\train.npz,"(2153, 5, 58)","(2153,)",40,0.4143056200650255
+presleep_seq_001,validation,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\validation.npz,"(312, 5, 58)","(312,)",8,0.36538461538461536
+presleep_seq_001,test,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\test.npz,"(825, 5, 58)","(825,)",14,0.36
+presleep_seq_002,train,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_7\train.npz,"(2073, 7, 58)","(2073,)",39,0.41775205016883743
+presleep_seq_002,validation,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_7\validation.npz,"(296, 7, 58)","(296,)",8,0.3581081081081081
+presleep_seq_002,test,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_7\test.npz,"(797, 7, 58)","(797,)",14,0.3601003764115433
+presleep_seq_003,train,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\train.npz,"(2153, 5, 58)","(2153,)",40,0.4143056200650255
+presleep_seq_003,validation,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\validation.npz,"(312, 5, 58)","(312,)",8,0.36538461538461536
+presleep_seq_003,test,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\test.npz,"(825, 5, 58)","(825,)",14,0.36
+presleep_seq_004,train,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\train.npz,"(2153, 5, 58)","(2153,)",40,0.4143056200650255
+presleep_seq_004,validation,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\validation.npz,"(312, 5, 58)","(312,)",8,0.36538461538461536
+presleep_seq_004,test,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\test.npz,"(825, 5, 58)","(825,)",14,0.36
+presleep_seq_005,train,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\train.npz,"(2153, 5, 58)","(2153,)",40,0.4143056200650255
+presleep_seq_005,validation,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\validation.npz,"(312, 5, 58)","(312,)",8,0.36538461538461536
+presleep_seq_005,test,data\processed\pre_sleep_forecasting\design_c_stage1\sequence_tensors\window_5\test.npz,"(825, 5, 58)","(825,)",14,0.36
