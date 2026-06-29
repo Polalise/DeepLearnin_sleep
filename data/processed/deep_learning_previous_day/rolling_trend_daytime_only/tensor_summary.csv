@@ -1,0 +1,10 @@
+﻿tensor_type,window,split,samples,participants,features,shape,target_0,target_1,target_mean,nan_count,inf_count
+mlp_current_day,1,train,2135,41,122,"(2135, 122)",1269,866,0.4056206088992974,0,0
+mlp_current_day,1,test,524,12,122,"(524, 122)",325,199,0.3797709923664122,0,0
+mlp_current_day,1,validation,457,10,122,"(457, 122)",277,180,0.3938730853391685,0,0
+gru_sequence,7,train,1303,33,122,"(1303, 7, 122)",779,524,0.40214888718342284,0,0
+gru_sequence,7,test,296,9,122,"(296, 7, 122)",173,123,0.4155405405405405,0,0
+gru_sequence,7,validation,245,9,122,"(245, 7, 122)",153,92,0.37551020408163266,0,0
+gru_sequence,14,train,887,27,122,"(887, 14, 122)",553,334,0.3765501691093574,0,0
+gru_sequence,14,test,206,5,122,"(206, 14, 122)",109,97,0.470873786407767,0,0
+gru_sequence,14,validation,136,7,122,"(136, 14, 122)",88,48,0.35294117647058826,0,0

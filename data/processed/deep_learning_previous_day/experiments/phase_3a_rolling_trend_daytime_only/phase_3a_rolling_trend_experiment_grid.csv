@@ -1,0 +1,4 @@
+﻿experiment_id,feature_timing,subset_name,model_family,window,tensor_dir,feature_count,calendar_features_used,notes
+phase3a_000,previous_day,daytime_only_rolling_trend,mlp_current_day,1,data\processed\deep_learning_previous_day\rolling_trend_daytime_only\mlp_current_day,122,False,MLP on previous-day daytime_only rolling/trend tabular features
+phase3a_001,previous_day,daytime_only_rolling_trend,gru,7,data\processed\deep_learning_previous_day\rolling_trend_daytime_only\sequence_gru_ready\window_7,122,False,"GRU on previous-day daytime_only rolling/trend sequence features, window 7"
+phase3a_002,previous_day,daytime_only_rolling_trend,gru,14,data\processed\deep_learning_previous_day\rolling_trend_daytime_only\sequence_gru_ready\window_14,122,False,"GRU on previous-day daytime_only rolling/trend sequence features, window 14"

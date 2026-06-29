@@ -1,0 +1,10 @@
+﻿metric,value
+samples,881.0
+participants,14.0
+bins,10.0
+brier_score,0.2126377593119057
+expected_calibration_error,0.12563139880817253
+maximum_calibration_error,0.83423397
+mean_predicted_probability,0.43964842822928496
+observed_positive_rate,0.36095346197502837
+selected_threshold,0.54

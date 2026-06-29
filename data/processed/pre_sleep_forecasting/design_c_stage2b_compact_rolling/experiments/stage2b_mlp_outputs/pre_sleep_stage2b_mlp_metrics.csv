@@ -1,0 +1,4 @@
+﻿experiment_id,feature_timing,subset_name,model_family,window,split,seed,best_epoch,selected_threshold_from_validation,threshold,balanced_accuracy,f1,precision,recall,tn,fp,fn,tp,roc_auc,average_precision
+presleep_stage2b_000,pre_sleep,design_c_stage2b_compact_rolling,mlp_current_day,1,train,2026,9,0.4,0.4,0.6922954568048514,0.6818727490996399,0.5528877352368592,0.8893528183716075,676,689,106,852,0.8054868583052299,0.7495586985120296
+presleep_stage2b_000,pre_sleep,design_c_stage2b_compact_rolling,mlp_current_day,1,validation,2026,9,0.4,0.4,0.7123497267759563,0.6492753623188405,0.5022421524663677,0.9180327868852459,114,111,10,112,0.7350091074681238,0.551719454195313
+presleep_stage2b_000,pre_sleep,design_c_stage2b_compact_rolling,mlp_current_day,1,test,2026,9,0.4,0.4,0.5922925254420948,0.5530054644808743,0.423785594639866,0.7955974842767296,219,344,65,253,0.6852273869767753,0.5788180698734088

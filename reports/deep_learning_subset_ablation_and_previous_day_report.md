@@ -26,6 +26,20 @@ This report summarizes the first two deep learning data-improvement rounds.
 | test precision | `0.7394` |
 | test recall | `0.9242` |
 
+## Participant-Level Bootstrap Uncertainty
+
+Participant-level bootstrap resampling was used to estimate uncertainty while preserving within-participant row dependence more conservatively than row-level resampling.
+
+| candidate | feature timing | model | participants | test rows | metric | original | bootstrap mean | 95% CI |
+| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |
+| `phase1a_003` | same-date | `daytime_only / window 7 / mlp_current_day` | 9 | 314 | balanced accuracy | 0.8440 | 0.8486 | [0.8042, 0.8924] |
+| `phase1a_003` | same-date | `daytime_only / window 7 / mlp_current_day` | 9 | 314 | ROC AUC | 0.9023 | 0.9064 | [0.8483, 0.9463] |
+| `phase1a_002` | same-date | `daytime_only / window 7 / GRU` | 9 | 314 | balanced accuracy | 0.8317 | 0.8350 | [0.7886, 0.8859] |
+| `phase1a_007` | same-date | `daytime_only / window 14 / mlp_current_day` | 5 | 214 | balanced accuracy | 0.8291 | 0.8305 | [0.7805, 0.8730] |
+| `phase2a_006` | previous-day | `daytime_only / window 14 / BiLSTM` | 5 | 206 | balanced accuracy | 0.6098 | 0.5871 | [0.4758, 0.7413] |
+
+The bootstrap results support `phase1a_003` as the strongest current candidate. Its participant-level confidence interval remains well above 0.80 for balanced accuracy, while the best previous-day candidate has a much wider interval and substantially lower central performance.
+
 ## Test Comparison By Feature Timing
 
 | feature_timing | subset_name | split | experiments | mean_balanced_accuracy | max_balanced_accuracy | mean_roc_auc | max_roc_auc | mean_f1 | max_f1 |
@@ -86,6 +100,7 @@ For the current project, the most defensible result is to report two tracks:
 2. Strict previous-day experiment:
    - lower performance
    - useful as a conservative timing-control analysis
+   - substantially wider uncertainty under participant-level bootstrap
 
 ## Limitations
 
@@ -99,5 +114,5 @@ For the current project, the most defensible result is to report two tracks:
 1. Use `same_date / daytime_only / window 7 / mlp_current_day` as the current best same-date classifier.
 2. Keep `same_date / daytime_only / window 7 / GRU` as the best sequence-model comparison candidate.
 3. Report previous-day results as a stricter timing sensitivity analysis.
-4. Run participant-level bootstrap confidence intervals for the selected candidates.
-5. Update the main pipeline summary notebook once the final reporting structure is fixed.
+4. Update the main pipeline summary notebook once the final reporting structure is fixed.
+5. Keep any final claim carefully scoped as same-date classification unless a future prospective feature design improves previous-day performance.

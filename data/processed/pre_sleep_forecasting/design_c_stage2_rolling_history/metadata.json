@@ -1,0 +1,65 @@
+{
+  "created_at": "2026-06-29T13:44:03",
+  "dataset_name": "pre_sleep_design_c_stage2_rolling_history",
+  "source_stage1_dataset": "data\\processed\\pre_sleep_forecasting\\design_c_stage1\\pre_sleep_design_c_stage1_dataset_with_split.csv",
+  "prediction_target": "good_sleep_label for the sleep episode starting at sleep_start_datetime",
+  "prediction_cutoff": "sleep_start_datetime",
+  "strict_rule": "Rolling/history features use previous episodes only via shift(1).",
+  "rows": 3551,
+  "participants": 69,
+  "stage1_final_features": 58,
+  "rolling_base_features": 29,
+  "created_rolling_features": 319,
+  "history_indicator_features": 3,
+  "candidate_feature_count": 380,
+  "zero_variance_removed_features": 0,
+  "final_feature_count": 380,
+  "rolling_windows": [
+    3,
+    7
+  ],
+  "rolling_stats": [
+    "mean",
+    "std",
+    "min",
+    "max"
+  ],
+  "split_column": "pre_sleep_split",
+  "outputs": {
+    "dataset": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_rolling_history_dataset.csv",
+    "feature_columns": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_feature_columns.csv",
+    "final_feature_columns": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_final_feature_columns.csv",
+    "zero_variance_removed_features": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_zero_variance_removed_features.csv",
+    "missing_summary": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_missing_summary.csv",
+    "tensor_dir": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\mlp_current_day_final",
+    "tensor_summary": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_tensor_summary.csv",
+    "imputer": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_median_imputer.joblib",
+    "scaler": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\pre_sleep_design_c_stage2_standard_scaler.joblib"
+  },
+  "stage2_training": {
+    "experiment_id": "presleep_stage2_000",
+    "model_family": "mlp_current_day",
+    "feature_timing": "pre_sleep",
+    "subset_name": "design_c_stage2_rolling_history",
+    "window": 1,
+    "seed": 2026,
+    "max_epochs": 120,
+    "patience": 20,
+    "batch_size": 64,
+    "learning_rate": 0.0008,
+    "weight_decay": 0.0003,
+    "hidden_dims": [
+      128,
+      64,
+      32
+    ],
+    "dropout": 0.35,
+    "best_epoch": 2,
+    "selected_threshold_from_validation": 0.48,
+    "metrics_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\experiments\\stage2_mlp_outputs\\pre_sleep_stage2_mlp_metrics.csv",
+    "history_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\experiments\\stage2_mlp_outputs\\pre_sleep_stage2_mlp_training_history.csv",
+    "predictions_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\experiments\\stage2_mlp_outputs\\pre_sleep_stage2_mlp_predictions.csv",
+    "model_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\experiments\\stage2_mlp_outputs\\models\\presleep_stage2_000_best.pt",
+    "comparison_path": "data\\processed\\pre_sleep_forecasting\\design_c_stage2_rolling_history\\experiments\\stage2_mlp_outputs\\pre_sleep_stage1_vs_stage2_comparison.csv"
+  }
+}

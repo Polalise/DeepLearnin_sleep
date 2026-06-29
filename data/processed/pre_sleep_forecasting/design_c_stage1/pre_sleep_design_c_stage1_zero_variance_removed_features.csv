@@ -1,0 +1,13 @@
+﻿removed_feature,train_scaled_std
+previous_day_resting_hr_record_count,0.0
+previous_day_calories_record_count,0.0
+steps_pre_sleep_record_count_missing_ind,0.0
+steps_pre_sleep_active_record_count_missing_ind,0.0
+calories_pre_sleep_record_count_missing_ind,0.0
+heart_rate_pre_sleep_record_count_missing_ind,0.0
+pre_sleep_window_hours_missing_ind,0.0
+sleep_start_hour_missing_ind,0.0
+sleep_start_dayofweek_sin_missing_ind,0.0
+sleep_start_dayofweek_cos_missing_ind,0.0
+sleep_start_month_sin_missing_ind,0.0
+sleep_start_month_cos_missing_ind,0.0

@@ -1,0 +1,3 @@
+﻿model_role,experiment_id,subset_name,features,test_balanced_accuracy,test_roc_auc,test_average_precision,test_f1,test_precision,test_recall,delta_balanced_accuracy_vs_stage1
+stage1_reference,presleep_stage1_000,design_c_stage1_intraday_previous_day,58,0.6337623021325558,0.687500698191405,0.6008560603445885,0.4904214559386973,0.6274509803921569,0.4025157232704403,0.0
+stage2_rolling_history,presleep_stage2_000,design_c_stage2_rolling_history,380,0.6024861199548689,0.6627791369237128,0.5854547430812607,0.530718954248366,0.4541387024608501,0.6383647798742138,-0.031276182177686906

@@ -1,0 +1,4 @@
+﻿tensor_type,split,samples,features,participants,target_0,target_1,target_mean,nan_count,inf_count,path
+mlp_current_day_final,train,2323,380,46,1365,958,0.41239776151528196,0,0,data\processed\pre_sleep_forecasting\design_c_stage2_rolling_history\mlp_current_day_final\train.npz
+mlp_current_day_final,validation,347,380,9,225,122,0.3515850144092219,0,0,data\processed\pre_sleep_forecasting\design_c_stage2_rolling_history\mlp_current_day_final\validation.npz
+mlp_current_day_final,test,881,380,14,563,318,0.36095346197502837,0,0,data\processed\pre_sleep_forecasting\design_c_stage2_rolling_history\mlp_current_day_final\test.npz

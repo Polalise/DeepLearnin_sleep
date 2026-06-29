@@ -1,0 +1,38 @@
+{
+  "created_at": "2026-06-29T10:00:36",
+  "source_dataset": "data\\processed\\deep_learning_previous_day\\modeling_dataset_previous_day_encoded.csv",
+  "source_feature_subset": "data\\processed\\deep_learning_feature_subsets\\daytime_only_features.csv",
+  "feature_timing": "previous_day",
+  "subset_name": "daytime_only_rolling_trend",
+  "base_feature_count": 19,
+  "engineered_feature_count_before_zero_variance_filter": 228,
+  "zero_variance_removed_count": 106,
+  "final_feature_count": 122,
+  "rolling_windows": [
+    3,
+    7
+  ],
+  "rolling_statistics": [
+    "mean",
+    "std",
+    "min",
+    "max"
+  ],
+  "trend_features": [
+    "block_diff1",
+    "dev_from_block_roll3_mean",
+    "dev_from_block_roll7_mean"
+  ],
+  "calendar_features_used": false,
+  "contiguous_block_rule": "new block when participant changes or feature_date gap is not exactly 1 day",
+  "scaler_rule": "StandardScaler fit on train split only after zero-variance feature removal",
+  "saved_outputs": {
+    "engineered_dataset": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\modeling_dataset_previous_day_daytime_only_rolling_trend.csv",
+    "feature_columns": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\rolling_trend_daytime_only_feature_columns.csv",
+    "zero_variance_removed_features": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\zero_variance_removed_features.csv",
+    "scaler": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\rolling_trend_daytime_only_standard_scaler.joblib",
+    "mlp_current_day_dir": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\mlp_current_day",
+    "sequence_gru_ready_dir": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\sequence_gru_ready",
+    "tensor_summary": "data\\processed\\deep_learning_previous_day\\rolling_trend_daytime_only\\tensor_summary.csv"
+  }
+}
