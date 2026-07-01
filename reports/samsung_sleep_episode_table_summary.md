@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Create a sleep episode table from Samsung Health sleep export for strict pre-sleep inference preparation.
+Create a sleep episode table from Samsung Health sleep_stage export for strict pre-sleep inference preparation.
 
 ## Source
 
 ```text
-docs\samsunghealth\com.samsung.shealth.sleep.20260629163038.csv
+docs\samsunghealth\com.samsung.health.sleep_stage.20260629163038.csv
 ```
 
 ## Output
@@ -20,26 +20,37 @@ data\processed\samsung_health\pre_sleep_stage1\samsung_sleep_episodes.csv
 
 | Metric | Value |
 |---|---:|
-| source_file | docs\samsunghealth\com.samsung.shealth.sleep.20260629163038.csv |
-| source_rows | 1698 |
-| valid_episode_rows | 28 |
-| invalid_or_filtered_rows | 1670 |
-| start_column | com.samsung.health.sleep.pkg_name |
-| end_column | com.samsung.health.sleep.update_time |
-| datauuid_column | com.samsung.health.sleep.end_time |
-| sleep_score_non_missing | 6 |
-| sleep_score_missing | 22 |
-| good_sleep_score_threshold | 80 |
-| proxy_label_positive_rate | 1.0 |
-| min_sleep_start_datetime | 2018-11-08 23:10:00 |
-| max_sleep_start_datetime | 2025-07-05 00:43:00 |
-| median_duration_hours_from_time | 3.8422252777777777 |
-
-## Label Caveat
-
-`samsung_good_sleep_label` is a proxy label derived from Samsung `sleep_score`.
-It is not identical to the original LifeSnaps `good_sleep_label`.
+| source_file | docs\samsunghealth\com.samsung.health.sleep_stage.20260629163038.csv |
+| source_stage_rows | 92744 |
+| valid_stage_rows | 92744 |
+| raw_episode_count | 1642 |
+| valid_episode_rows | 1493 |
+| invalid_or_filtered_episode_rows | 149 |
+| min_sleep_start_datetime | 2021-07-30 03:40:14 |
+| max_sleep_start_datetime | 2026-06-27 03:39:00 |
+| median_duration_hours | 6.246388888888889 |
+| mean_duration_hours | 6.788186565825706 |
+| cross_midnight_rate | 0.08908238446081715 |
+| sleep_score_joined | False |
 
 ## Column Mapping Note
 
-This export required fallback column mapping for sleep start/end/datauuid because the Samsung sleep CSV data rows contain one more field than the header row and the tail fields are shifted.
+This Samsung Health export has shifted sleep_stage tail fields.
+
+Observed mapping:
+
+```text
+source_sleep_id = start_time
+stage_start_datetime = create_sh_ver
+stage_end_datetime = update_time
+samsung_stage_code = create_time
+stage_utc_offset = stage
+source_stage_datauuid = end_time
+```
+
+Stage start/end datetimes are adjusted by the observed UTC offset before episode aggregation.
+
+## Label Caveat
+
+`samsung_sleep_score` and `samsung_good_sleep_label` are not joined in this table yet.
+A Samsung sleep-score proxy label can be added later by linking to the Samsung sleep table.

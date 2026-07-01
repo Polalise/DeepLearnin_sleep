@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import csv
-import re
+import os
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,7 @@ import pandas as pd
 PROJECT_ROOT = Path(r"C:\workSpace\DeepLearnin_sleep")
 
 SAMSUNG_DIR_CANDIDATES = [
+    Path(os.environ["SAMSUNG_HEALTH_DIR"]) if os.environ.get("SAMSUNG_HEALTH_DIR") else None,
     PROJECT_ROOT / "docs" / "samsung",
     PROJECT_ROOT / "docs" / "samsunghealth",
     PROJECT_ROOT / "docs",
@@ -20,14 +21,14 @@ SAMSUNG_DIR_CANDIDATES = [
 OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "samsung_health" / "pre_sleep_stage1"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-SLEEP_DATASET = "com.samsung.shealth.sleep"
+SLEEP_STAGE_DATASET = "com.samsung.health.sleep_stage"
 
 OUTPUT_PATH = OUTPUT_DIR / "samsung_sleep_episodes.csv"
 SUMMARY_PATH = OUTPUT_DIR / "samsung_sleep_episode_summary.csv"
+STAGE_SUMMARY_PATH = OUTPUT_DIR / "samsung_sleep_stage_episode_stage_summary.csv"
 REPORT_PATH = PROJECT_ROOT / "reports" / "samsung_sleep_episode_table_summary.md"
 
 PARTICIPANT_ID = "samsung_user"
-GOOD_SLEEP_SCORE_THRESHOLD = 80
 
 MIN_SLEEP_DURATION_HOURS = 2.0
 MAX_SLEEP_DURATION_HOURS = 16.0
@@ -35,7 +36,7 @@ MAX_SLEEP_DURATION_HOURS = 16.0
 
 def find_dataset_file(dataset_name: str) -> Path:
     for root in SAMSUNG_DIR_CANDIDATES:
-        if not root.exists():
+        if root is None or not root.exists():
             continue
 
         matches = sorted(root.glob(f"{dataset_name}.*.csv"))
@@ -57,262 +58,181 @@ def read_samsung_csv(path: Path) -> pd.DataFrame:
     - line 3+: data
 
     Some Samsung Health files have one more data field than header fields.
-    This reader pads the header with leading extra columns so rows can be loaded
-    without pandas silently shifting fields.
+    This reader pads the header with leading extra columns so rows can be loaded.
     """
     with open(path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
         _metadata = next(reader)
         header = next(reader)
+        rows = list(reader)
 
-        rows = []
-        max_fields = len(header)
-
-        for row in reader:
-            rows.append(row)
-            if len(row) > max_fields:
-                max_fields = len(row)
+    max_fields = max([len(header)] + [len(row) for row in rows])
 
     if max_fields > len(header):
         extra_count = max_fields - len(header)
         header = [f"_extra_field_{i}" for i in range(extra_count)] + header
 
-    normalized_rows = []
+    fixed_rows = []
     for row in rows:
         if len(row) < len(header):
             row = row + [""] * (len(header) - len(row))
         elif len(row) > len(header):
             row = row[: len(header)]
-        normalized_rows.append(row)
+        fixed_rows.append(row)
 
-    df = pd.DataFrame(normalized_rows, columns=header)
+    df = pd.DataFrame(fixed_rows, columns=header)
     df = df.replace("", np.nan).infer_objects(copy=False)
 
     return df
-
-
-def find_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
-    exact_map = {str(col).lower(): col for col in df.columns}
-
-    for candidate in candidates:
-        if candidate.lower() in exact_map:
-            return exact_map[candidate.lower()]
-
-    for candidate in candidates:
-        candidate_l = candidate.lower()
-        for col in df.columns:
-            col_l = str(col).lower()
-            if col_l.endswith("." + candidate_l) or col_l.endswith(candidate_l):
-                return col
-
-    return None
 
 
 def parse_datetime(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series, errors="coerce")
 
 
-def parsed_non_missing_count(df: pd.DataFrame, col: str | None) -> int:
-    if col is None or col not in df.columns:
-        return 0
-    return int(pd.to_datetime(df[col], errors="coerce").notna().sum())
-
-
-def looks_like_uuid_value(value) -> bool:
+def parse_utc_offset_minutes(value) -> float:
     if pd.isna(value):
-        return False
-    text = str(value)
-    return bool(re.match(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", text))
+        return np.nan
+    text = str(value).strip()
+    if not text.startswith("UTC") or len(text) < 8:
+        return np.nan
+    sign = 1 if text[3] == "+" else -1
+    hours = pd.to_numeric(text[4:6], errors="coerce")
+    minutes = pd.to_numeric(text[6:8], errors="coerce")
+    if pd.isna(hours) or pd.isna(minutes):
+        return np.nan
+    return float(sign * (hours * 60 + minutes))
 
 
-def looks_like_uuid_series(series: pd.Series) -> bool:
-    sample = series.dropna().astype(str).head(50)
-    if len(sample) == 0:
-        return False
-    return float(sample.map(looks_like_uuid_value).mean()) > 0.5
-
-
-def choose_sleep_columns(sleep_df: pd.DataFrame) -> tuple[str, str, str | None]:
-    start_col = find_column(
-        sleep_df,
-        ["start_time", "com.samsung.health.sleep.start_time"],
-    )
-    end_col = find_column(
-        sleep_df,
-        ["end_time", "com.samsung.health.sleep.end_time"],
-    )
-    datauuid_col = find_column(
-        sleep_df,
-        ["datauuid", "com.samsung.health.sleep.datauuid"],
-    )
-
-    print("INITIAL START_COL:", start_col)
-    print("INITIAL END_COL:", end_col)
-    print("INITIAL DATAUUID_COL:", datauuid_col)
-
-    # This Samsung sleep export has a shifted tail:
-    # actual sleep start appears under pkg_name,
-    # actual sleep end appears under update_time,
-    # actual datauuid appears under end_time.
-    fallback_start = "com.samsung.health.sleep.pkg_name"
-    fallback_end = "com.samsung.health.sleep.update_time"
-    fallback_uuid = "com.samsung.health.sleep.end_time"
-
-    if parsed_non_missing_count(sleep_df, start_col) == 0:
-        if fallback_start in sleep_df.columns and parsed_non_missing_count(sleep_df, fallback_start) > 0:
-            print("Using fallback START_COL:", fallback_start)
-            start_col = fallback_start
-
-    if end_col is not None and end_col in sleep_df.columns and looks_like_uuid_series(sleep_df[end_col]):
-        if fallback_end in sleep_df.columns and parsed_non_missing_count(sleep_df, fallback_end) > 0:
-            print("Using fallback END_COL:", fallback_end)
-            end_col = fallback_end
-
-    if fallback_uuid in sleep_df.columns and looks_like_uuid_series(sleep_df[fallback_uuid]):
-        print("Using fallback DATAUUID_COL:", fallback_uuid)
-        datauuid_col = fallback_uuid
-
-    if start_col is None or end_col is None:
-        raise ValueError(
-            f"Could not identify sleep start/end columns. Columns: {sleep_df.columns.tolist()}"
-        )
-
-    print("FINAL START_COL:", start_col)
-    print("FINAL END_COL:", end_col)
-    print("FINAL DATAUUID_COL:", datauuid_col)
-
-    preview_cols = [col for col in [start_col, end_col, datauuid_col] if col is not None]
-    print("Column preview:")
-    print(sleep_df[preview_cols].head())
-
-    return start_col, end_col, datauuid_col
-
-
-def first_existing_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
-    return find_column(df, candidates)
-
-
-def numeric_column_or_nan(df: pd.DataFrame, column: str | None) -> pd.Series:
-    if column is None:
-        return pd.Series(np.nan, index=df.index)
-    return pd.to_numeric(df[column], errors="coerce")
+def apply_utc_offset(datetime_series: pd.Series, offset_series: pd.Series) -> pd.Series:
+    offsets = offset_series.map(parse_utc_offset_minutes)
+    return datetime_series + pd.to_timedelta(offsets.fillna(0), unit="m")
 
 
 def make_sleep_episode_id(row: pd.Series) -> str:
     start_token = row["sleep_start_datetime"].strftime("%Y%m%d%H%M%S")
     end_token = row["sleep_end_datetime"].strftime("%Y%m%d%H%M%S")
-    datauuid = str(row.get("source_datauuid", ""))
-    datauuid_short = datauuid[:12] if datauuid and datauuid != "nan" else "no_uuid"
-    return f"{PARTICIPANT_ID}__{start_token}__{end_token}__{datauuid_short}"
+    sleep_id_short = str(row["source_sleep_id"])[-12:]
+    return f"{PARTICIPANT_ID}__{start_token}__{end_token}__{sleep_id_short}"
 
 
 def main() -> None:
-    sleep_path = find_dataset_file(SLEEP_DATASET)
-    sleep_df = read_samsung_csv(sleep_path)
+    sleep_stage_path = find_dataset_file(SLEEP_STAGE_DATASET)
+    stage_df = read_samsung_csv(sleep_stage_path)
 
-    print("sleep source:", sleep_path)
-    print("raw sleep shape:", sleep_df.shape)
+    print("sleep_stage source:", sleep_stage_path)
+    print("raw sleep_stage shape:", stage_df.shape)
+    print("columns:", stage_df.columns.tolist())
 
-    start_col, end_col, datauuid_col = choose_sleep_columns(sleep_df)
-
-    output_df = pd.DataFrame(index=sleep_df.index)
-
-    output_df["participant_object_id"] = PARTICIPANT_ID
-    output_df["sleep_start_datetime"] = parse_datetime(sleep_df[start_col])
-    output_df["sleep_end_datetime"] = parse_datetime(sleep_df[end_col])
-
-    if datauuid_col is not None:
-        output_df["source_datauuid"] = sleep_df[datauuid_col].astype(str)
-    else:
-        output_df["source_datauuid"] = ""
-
-    sleep_score_col = first_existing_column(sleep_df, ["sleep_score"])
-    efficiency_col = first_existing_column(sleep_df, ["efficiency"])
-    sleep_duration_col = first_existing_column(sleep_df, ["sleep_duration"])
-    sleep_type_col = first_existing_column(sleep_df, ["sleep_type"])
-    quality_col = first_existing_column(sleep_df, ["quality"])
-
-    output_df["samsung_sleep_score"] = numeric_column_or_nan(sleep_df, sleep_score_col)
-    output_df["samsung_sleep_efficiency"] = numeric_column_or_nan(sleep_df, efficiency_col)
-    output_df["samsung_sleep_duration_ms"] = numeric_column_or_nan(sleep_df, sleep_duration_col)
-    output_df["samsung_sleep_type"] = numeric_column_or_nan(sleep_df, sleep_type_col)
-    output_df["samsung_quality_code"] = numeric_column_or_nan(sleep_df, quality_col)
-
-    optional_numeric_cols = [
-        "physical_recovery",
-        "mental_recovery",
-        "sleep_latency",
-        "movement_awakening",
-        "sleep_cycle",
-        "total_rem_duration",
-        "total_light_duration",
-        "factor_01",
-        "factor_02",
-        "factor_03",
-        "factor_04",
-        "factor_05",
-        "factor_06",
-        "factor_07",
-        "factor_08",
-        "factor_09",
-        "factor_10",
+    required_columns = [
+        "start_time",
+        "create_sh_ver",
+        "update_time",
+        "create_time",
+        "end_time",
     ]
 
-    for col in optional_numeric_cols:
-        actual_col = first_existing_column(sleep_df, [col])
-        output_df[f"samsung_{col}"] = numeric_column_or_nan(sleep_df, actual_col)
+    missing = [col for col in required_columns if col not in stage_df.columns]
+    if missing:
+        raise ValueError(f"Missing required sleep_stage columns: {missing}")
 
-    output_df["sleep_duration_hours_from_time"] = (
-        output_df["sleep_end_datetime"] - output_df["sleep_start_datetime"]
+    # In this Samsung Health export, sleep_stage tail fields are shifted:
+    # - start_time contains the sleep episode UUID
+    # - create_sh_ver contains segment start time
+    # - update_time contains segment end time
+    # - create_time contains stage code
+    # - stage contains UTC offset, e.g. UTC+0900
+    # - end_time contains segment datauuid
+    stage_df["source_sleep_id"] = stage_df["start_time"].astype(str)
+    stage_df["stage_start_datetime"] = parse_datetime(stage_df["create_sh_ver"])
+    stage_df["stage_end_datetime"] = parse_datetime(stage_df["update_time"])
+    stage_df["stage_utc_offset"] = stage_df["stage"].astype(str)
+    stage_df["stage_start_datetime"] = apply_utc_offset(
+        stage_df["stage_start_datetime"],
+        stage_df["stage_utc_offset"],
+    )
+    stage_df["stage_end_datetime"] = apply_utc_offset(
+        stage_df["stage_end_datetime"],
+        stage_df["stage_utc_offset"],
+    )
+    stage_df["samsung_stage_code"] = pd.to_numeric(stage_df["create_time"], errors="coerce")
+    stage_df["source_stage_datauuid"] = stage_df["end_time"].astype(str)
+
+    valid_stage_df = stage_df.dropna(
+        subset=[
+            "source_sleep_id",
+            "stage_start_datetime",
+            "stage_end_datetime",
+        ]
+    ).copy()
+
+    valid_stage_df["stage_duration_minutes"] = (
+        valid_stage_df["stage_end_datetime"] - valid_stage_df["stage_start_datetime"]
+    ).dt.total_seconds() / 60
+
+    stage_summary_df = (
+        valid_stage_df.groupby(["source_sleep_id", "samsung_stage_code"], dropna=False)
+        .agg(
+            stage_rows=("samsung_stage_code", "size"),
+            stage_total_minutes=("stage_duration_minutes", "sum"),
+        )
+        .reset_index()
+    )
+
+    episode_df = (
+        valid_stage_df.groupby("source_sleep_id")
+        .agg(
+            sleep_start_datetime=("stage_start_datetime", "min"),
+            sleep_end_datetime=("stage_end_datetime", "max"),
+            stage_rows=("samsung_stage_code", "size"),
+            unique_stage_codes=("samsung_stage_code", "nunique"),
+            min_stage_code=("samsung_stage_code", "min"),
+            max_stage_code=("samsung_stage_code", "max"),
+        )
+        .reset_index()
+    )
+
+    episode_df["participant_object_id"] = PARTICIPANT_ID
+
+    episode_df["sleep_duration_hours"] = (
+        episode_df["sleep_end_datetime"] - episode_df["sleep_start_datetime"]
     ).dt.total_seconds() / 3600
 
-    output_df["sleep_duration_hours_from_samsung"] = (
-        output_df["samsung_sleep_duration_ms"] / (1000 * 60 * 60)
-    )
+    episode_df["calendar_date"] = episode_df["sleep_end_datetime"].dt.normalize()
+    episode_df["sleep_start_date"] = episode_df["sleep_start_datetime"].dt.normalize()
+    episode_df["sleep_end_date"] = episode_df["sleep_end_datetime"].dt.normalize()
 
-    output_df["calendar_date"] = output_df["sleep_end_datetime"].dt.normalize()
-    output_df["sleep_start_date"] = output_df["sleep_start_datetime"].dt.normalize()
-    output_df["sleep_end_date"] = output_df["sleep_end_datetime"].dt.normalize()
-
-    output_df["cross_midnight"] = (
-        output_df["sleep_start_date"] != output_df["sleep_end_date"]
+    episode_df["prediction_cutoff_datetime"] = episode_df["sleep_start_datetime"]
+    episode_df["cross_midnight"] = (
+        episode_df["sleep_start_date"] != episode_df["sleep_end_date"]
     ).astype(int)
 
-    output_df["has_samsung_sleep_score"] = output_df["samsung_sleep_score"].notna().astype(int)
-
-    output_df["samsung_good_sleep_label"] = np.where(
-        output_df["samsung_sleep_score"].notna(),
-        (output_df["samsung_sleep_score"] >= GOOD_SLEEP_SCORE_THRESHOLD).astype(int),
-        np.nan,
+    valid_episode_mask = episode_df["sleep_duration_hours"].between(
+        MIN_SLEEP_DURATION_HOURS,
+        MAX_SLEEP_DURATION_HOURS,
+        inclusive="both",
     )
 
-    valid_mask = (
-        output_df["sleep_start_datetime"].notna()
-        & output_df["sleep_end_datetime"].notna()
-        & output_df["sleep_duration_hours_from_time"].between(
-            MIN_SLEEP_DURATION_HOURS,
-            MAX_SLEEP_DURATION_HOURS,
-            inclusive="both",
-        )
-    )
+    invalid_episode_df = episode_df[~valid_episode_mask].copy()
+    episode_df = episode_df[valid_episode_mask].copy()
 
-    invalid_df = output_df[~valid_mask].copy()
-    output_df = output_df[valid_mask].copy()
+    if len(episode_df) == 0:
+        raise ValueError("No valid Samsung sleep_stage-derived episodes after duration filtering.")
 
-    if len(output_df) == 0:
-        raise ValueError(
-            "No valid Samsung sleep episodes after filtering. "
-            "Check sleep start/end column mapping and duration filters."
-        )
+    episode_df = episode_df.sort_values("sleep_start_datetime").reset_index(drop=True)
 
-    output_df = output_df.sort_values("sleep_start_datetime").reset_index(drop=True)
+    episode_df["sleep_episode_id"] = episode_df.apply(make_sleep_episode_id, axis=1)
 
-    output_df["sleep_episode_id"] = output_df.apply(make_sleep_episode_id, axis=1)
-    output_df["prediction_cutoff_datetime"] = output_df["sleep_start_datetime"]
+    # Keep label columns explicit but empty for now.
+    # Samsung sleep_score proxy labels require a separate join to the sleep table.
+    episode_df["samsung_sleep_score"] = np.nan
+    episode_df["samsung_good_sleep_label"] = np.nan
+    episode_df["has_samsung_sleep_score"] = 0
 
     column_order = [
         "sleep_episode_id",
         "participant_object_id",
+        "source_sleep_id",
         "sleep_start_datetime",
         "sleep_end_datetime",
         "prediction_cutoff_datetime",
@@ -320,51 +240,52 @@ def main() -> None:
         "sleep_start_date",
         "sleep_end_date",
         "cross_midnight",
-        "source_datauuid",
+        "sleep_duration_hours",
+        "stage_rows",
+        "unique_stage_codes",
+        "min_stage_code",
+        "max_stage_code",
         "samsung_sleep_score",
         "samsung_good_sleep_label",
         "has_samsung_sleep_score",
-        "samsung_sleep_efficiency",
-        "samsung_sleep_duration_ms",
-        "sleep_duration_hours_from_time",
-        "sleep_duration_hours_from_samsung",
-        "samsung_sleep_type",
-        "samsung_quality_code",
     ]
 
-    remaining_columns = [col for col in output_df.columns if col not in column_order]
-    output_df = output_df[column_order + remaining_columns]
+    remaining_columns = [col for col in episode_df.columns if col not in column_order]
+    episode_df = episode_df[column_order + remaining_columns]
 
-    output_df.to_csv(OUTPUT_PATH, index=False, encoding="utf-8-sig")
+    episode_df.to_csv(OUTPUT_PATH, index=False, encoding="utf-8-sig")
+    stage_summary_df.to_csv(STAGE_SUMMARY_PATH, index=False, encoding="utf-8-sig")
 
     summary_rows = [
-        {"metric": "source_file", "value": str(sleep_path.relative_to(PROJECT_ROOT))},
-        {"metric": "source_rows", "value": len(sleep_df)},
-        {"metric": "valid_episode_rows", "value": len(output_df)},
-        {"metric": "invalid_or_filtered_rows", "value": len(invalid_df)},
-        {"metric": "start_column", "value": start_col},
-        {"metric": "end_column", "value": end_col},
-        {"metric": "datauuid_column", "value": datauuid_col or ""},
-        {"metric": "sleep_score_non_missing", "value": int(output_df["samsung_sleep_score"].notna().sum())},
-        {"metric": "sleep_score_missing", "value": int(output_df["samsung_sleep_score"].isna().sum())},
-        {"metric": "good_sleep_score_threshold", "value": GOOD_SLEEP_SCORE_THRESHOLD},
-        {
-            "metric": "proxy_label_positive_rate",
-            "value": float(output_df["samsung_good_sleep_label"].dropna().mean())
-            if output_df["samsung_good_sleep_label"].notna().any()
-            else np.nan,
-        },
+        {"metric": "source_file", "value": str(sleep_stage_path.relative_to(PROJECT_ROOT))},
+        {"metric": "source_stage_rows", "value": len(stage_df)},
+        {"metric": "valid_stage_rows", "value": len(valid_stage_df)},
+        {"metric": "raw_episode_count", "value": int(valid_stage_df["source_sleep_id"].nunique())},
+        {"metric": "valid_episode_rows", "value": len(episode_df)},
+        {"metric": "invalid_or_filtered_episode_rows", "value": len(invalid_episode_df)},
         {
             "metric": "min_sleep_start_datetime",
-            "value": str(output_df["sleep_start_datetime"].min()) if len(output_df) else "",
+            "value": str(episode_df["sleep_start_datetime"].min()),
         },
         {
             "metric": "max_sleep_start_datetime",
-            "value": str(output_df["sleep_start_datetime"].max()) if len(output_df) else "",
+            "value": str(episode_df["sleep_start_datetime"].max()),
         },
         {
-            "metric": "median_duration_hours_from_time",
-            "value": float(output_df["sleep_duration_hours_from_time"].median()) if len(output_df) else np.nan,
+            "metric": "median_duration_hours",
+            "value": float(episode_df["sleep_duration_hours"].median()),
+        },
+        {
+            "metric": "mean_duration_hours",
+            "value": float(episode_df["sleep_duration_hours"].mean()),
+        },
+        {
+            "metric": "cross_midnight_rate",
+            "value": float(episode_df["cross_midnight"].mean()),
+        },
+        {
+            "metric": "sleep_score_joined",
+            "value": False,
         },
     ]
 
@@ -376,12 +297,12 @@ def main() -> None:
         "",
         "## Purpose",
         "",
-        "Create a sleep episode table from Samsung Health sleep export for strict pre-sleep inference preparation.",
+        "Create a sleep episode table from Samsung Health sleep_stage export for strict pre-sleep inference preparation.",
         "",
         "## Source",
         "",
         "```text",
-        str(sleep_path.relative_to(PROJECT_ROOT)),
+        str(sleep_stage_path.relative_to(PROJECT_ROOT)),
         "```",
         "",
         "## Output",
@@ -402,14 +323,27 @@ def main() -> None:
     report_lines.extend(
         [
             "",
-            "## Label Caveat",
-            "",
-            "`samsung_good_sleep_label` is a proxy label derived from Samsung `sleep_score`.",
-            "It is not identical to the original LifeSnaps `good_sleep_label`.",
-            "",
             "## Column Mapping Note",
             "",
-            "This export required fallback column mapping for sleep start/end/datauuid because the Samsung sleep CSV data rows contain one more field than the header row and the tail fields are shifted.",
+            "This Samsung Health export has shifted sleep_stage tail fields.",
+            "",
+            "Observed mapping:",
+            "",
+            "```text",
+            "source_sleep_id = start_time",
+            "stage_start_datetime = create_sh_ver",
+            "stage_end_datetime = update_time",
+            "samsung_stage_code = create_time",
+            "stage_utc_offset = stage",
+            "source_stage_datauuid = end_time",
+            "```",
+            "",
+            "Stage start/end datetimes are adjusted by the observed UTC offset before episode aggregation.",
+            "",
+            "## Label Caveat",
+            "",
+            "`samsung_sleep_score` and `samsung_good_sleep_label` are not joined in this table yet.",
+            "A Samsung sleep-score proxy label can be added later by linking to the Samsung sleep table.",
             "",
         ]
     )
@@ -418,6 +352,7 @@ def main() -> None:
 
     print("output:", OUTPUT_PATH)
     print("summary:", SUMMARY_PATH)
+    print("stage summary:", STAGE_SUMMARY_PATH)
     print("report:", REPORT_PATH)
     print()
     print(summary_df)

@@ -1,0 +1,8 @@
+streamlit
+altair
+google-cloud-storage
+numpy
+pandas
+scikit-learn
+joblib
+pymongo

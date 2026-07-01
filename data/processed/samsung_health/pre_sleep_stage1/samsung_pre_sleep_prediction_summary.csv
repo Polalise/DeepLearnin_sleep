@@ -1,0 +1,15 @@
+﻿metric,value
+rows,1493.0
+threshold,0.54
+predicted_positive_count,8.0
+predicted_negative_count,1485.0
+predicted_positive_rate,0.0053583389149363695
+mean_probability,0.3847823441028595
+std_probability,0.0329468809068203
+min_probability,0.22679568827152252
+p10_probability,0.35027801990509033
+p25_probability,0.36726996302604675
+median_probability,0.384555459022522
+p75_probability,0.4017978608608246
+p90_probability,0.4174559712409973
+max_probability,0.5885740518569946

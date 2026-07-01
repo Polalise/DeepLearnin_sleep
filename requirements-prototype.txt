@@ -1,0 +1,9 @@
+# Prototype UI dependencies.
+#
+# Install after requirements-inference.txt when running:
+#   prototype/pre_sleep_inference_app.py
+
+-r requirements-inference.txt
+streamlit
+altair
+google-cloud-storage

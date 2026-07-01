@@ -1,0 +1,14 @@
+﻿metric,value
+labeled_rows,64.0
+proxy_positive_rate,0.078125
+predicted_positive_rate,0.0
+mean_probability,0.3622547734375
+balanced_accuracy,0.5
+sensitivity,0.0
+specificity,1.0
+precision,
+recall,0.0
+tn,59.0
+fp,0.0
+fn,5.0
+tp,0.0

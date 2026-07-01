@@ -31,7 +31,9 @@ Completed work:
 - Selected the Stage 1 tiny regularized MLP as the final current model.
 - Added participant-level bootstrap uncertainty and calibration diagnostics.
 - Packaged reusable inference scripts and inference artifacts.
-- Created usage documentation, QA report, and final artifact inventory.
+- Created usage documentation, QA report, final artifact inventory, and a lightweight raw-feature inference debug tool.
+- Ran sequence-model and calibration follow-ups.
+- Built and evaluated a Samsung Health to Fitbit-compatible feature adapter as a cross-device transfer diagnostic.
 
 ## 3. Final Model
 
@@ -116,7 +118,7 @@ Important limitations:
 - Bootstrap confidence intervals are still wide.
 - Generalization to new participants remains uncertain.
 - Probability calibration is imperfect.
-- No external or future-period validation dataset has been used yet.
+- Samsung Health application was completed as a cross-device transfer diagnostic, but it did not provide formal external validation.
 - The model is not appropriate for clinical, medical, or high-stakes decision-making.
 
 Recommended use:
@@ -179,6 +181,12 @@ Usage guide:
 docs/pre_sleep_inference_usage.md
 ```
 
+Debug tool usage guide:
+
+```text
+docs/pre_sleep_prototype_usage.md
+```
+
 Artifact inventory:
 
 ```text
@@ -198,9 +206,99 @@ The project now has:
 - artifact inventory,
 - QA report.
 
-The current package is suitable as a research-grade inference prototype.
+The current package is suitable as a research-grade inference package. The existing Streamlit UI is a raw-feature debug tool, not the final Samsung live forecasting prototype.
 
-## 9. Remaining Optional Work
+Updated prototype status:
+
+- The raw-feature Streamlit debug tool remains available for inference-package checks.
+- The Samsung live forecasting prototype now provides the main demo surface:
+  - dashboard-first prediction state
+  - tonight forecast update using current Samsung history/baseline feature inputs
+  - Samsung Health sync prediction
+  - partial-input preset prediction
+  - preset scenario sensitivity comparison
+  - advanced retraining experiment planning surface
+  - model-flow and domain-shift caveat sections
+
+Prototype distinction:
+
+- `오늘 밤 예측 갱신` updates current feature inputs and runs the existing final MLP.
+- `고급 재학습` is separated as a research workflow and should require labeled data rebuild, validation, thresholding, calibration review, and artifact versioning before any candidate model is promoted.
+
+## 9. Samsung Health Transfer Diagnostic
+
+Samsung Health data were processed into a Fitbit-compatible Design C Stage 1 feature table and passed through the existing final inference package.
+
+Workflow:
+
+```text
+Samsung Health export
+-> sleep_stage-derived sleep episodes
+-> Samsung raw Stage 1 features
+-> existing Design C imputer/scaler/model
+-> Samsung prediction output
+-> sleep_score and stage-based proxy diagnostics
+```
+
+Main findings:
+
+- Samsung sleep episodes were built successfully after UTC offset correction.
+- Samsung Stage 1 raw features matched the 70-feature inference contract.
+- Pre-sleep heart-rate and previous-day daily activity coverage were usable.
+- Pre-sleep step/calorie interval coverage remained sparse because `pedometer_step_count` only covered a short recent date range.
+- Samsung `sleep_score` proxy labels matched only `64 / 1493` episodes.
+- Samsung stage-based proxy label v1 covered all `1493` episodes, but positive rate was only `0.0261`.
+- Against stage proxy label v1, the final MLP showed weak transfer:
+  - ROC AUC rank approximation: `0.3224`
+  - average precision: `0.0180`
+  - official threshold balanced accuracy: `0.4972`
+  - official threshold sensitivity: `0.0000`
+  - official threshold confusion matrix: TN `1446`, FP `8`, FN `39`, TP `0`
+
+Interpretation:
+
+- Samsung Health data can be transformed into a Fitbit-compatible feature schema for diagnostic inference.
+- The current Samsung run is not formal external validation.
+- The existing Fitbit-trained MLP should not be used as a reliable Samsung good-sleep classifier without Samsung-specific label design, calibration, and likely retraining/fine-tuning.
+
+Samsung summary reports:
+
+```text
+reports/samsung_health_core_table_profile.md
+reports/samsung_health_presleep_mapping_plan.md
+reports/samsung_sleep_episode_table_summary.md
+reports/samsung_pre_sleep_stage1_feature_build_summary.md
+reports/samsung_pre_sleep_external_prediction_summary.md
+reports/samsung_pre_sleep_external_prediction_interpretation.md
+reports/samsung_sleep_score_proxy_label_join_summary.md
+reports/samsung_sleep_score_proxy_evaluation_interpretation.md
+reports/samsung_stage_based_proxy_label_summary.md
+reports/samsung_stage_proxy_external_evaluation_report.md
+reports/samsung_to_fitbit_feature_mapping_confidence.md
+reports/samsung_to_fitbit_adapter_high_priority_improvements.md
+reports/samsung_presleep_activity_coverage_diagnostic.md
+```
+
+## 10. Follow-Up Work Completed
+
+Sequence-model follow-up:
+
+- GRU/LSTM/BiLSTM/CNN sequence variants were evaluated.
+- Best sequence result did not materially improve over the selected Stage 1 MLP.
+- Sequence models are not selected as final.
+
+Calibration follow-up:
+
+- Platt scaling improved Brier/ECE diagnostics in the selected-model follow-up.
+- Calibration remains optional post-processing.
+- Official final model and threshold remain unchanged.
+
+Samsung external/future follow-up:
+
+- Completed as a cross-device transfer diagnostic.
+- Result supports a strong domain-shift caveat.
+
+## 11. Remaining Optional Work
 
 Optional next steps now have planning documents:
 
@@ -216,3 +314,10 @@ The inference dependency reference is:
 ```text
 requirements-inference.txt
 ```
+
+Future work after this project state:
+
+- Samsung-first or canonical wearable feature schema.
+- Richer Samsung interval export or bin-level activity parsing.
+- Samsung-specific label design and calibration.
+- Samsung-specific model training only if time and labels are available.

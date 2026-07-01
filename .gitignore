@@ -182,3 +182,9 @@ cython_debug/
 
 # samsunghealth data
 docs/samsunghealth/*
+
+design/example/*
+docs/example/*
+report/figures/presentation_korean/*
+tmp_pdf_review/*
+tmp_pdf_review_v2/*

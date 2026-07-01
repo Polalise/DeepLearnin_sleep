@@ -128,6 +128,12 @@ Inference runner:
 src/pre_sleep_forecasting/inference.py
 ```
 
+Preset feature builder for partial-input prototype mode:
+
+```text
+src/pre_sleep_forecasting/preset_feature_builder.py
+```
+
 Package init:
 
 ```text
@@ -138,6 +144,129 @@ Reusable QA script:
 
 ```text
 scripts/24_check_pre_sleep_inference_package.py
+```
+
+Raw feature inference debug tool:
+
+```text
+prototype/pre_sleep_inference_app.py
+docs/pre_sleep_prototype_usage.md
+requirements-prototype.txt
+```
+
+Samsung live forecasting prototype:
+
+```text
+prototype/samsung_sleep_forecasting_app.py
+docs/samsung_sleep_live_prototype_usage.md
+data/processed/samsung_health/pre_sleep_stage1/prototype_snapshots/
+data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_raw_stage1_features.csv
+data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_prediction.csv
+data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_feature_source_summary.csv
+data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_scenario_comparison.csv
+data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_scenario_raw_features.csv
+```
+
+Samsung live prototype UI surfaces:
+
+```text
+dashboard with latest prediction target, prediction state, and snapshot delta
+today forecast update with current history/baseline feature inputs
+Samsung sync prediction table and recent probability trend
+partial-input preset prediction with feature-completeness status
+preset scenario comparison with probability spread
+advanced retraining experiment plan surface
+model flow explanation and cross-device caveat
+```
+
+Tonight forecast outputs:
+
+```text
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_sleep_target_episode.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_raw_stage1_features.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_sleep_forecast_prediction.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_samsung_only_raw_stage1_features.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_samsung_only_prediction.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_forecast_comparison.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_numeric_sensitivity.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_manual_wearable_supplement_report.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/snapshots/
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_stage1_feature_mapping_report.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_stage1_feature_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_sleep_forecast_prediction_summary.csv
+reports/samsung_today_sleep_forecast_feature_build_summary.md
+reports/samsung_today_sleep_forecast_prediction_summary.md
+reports/samsung_model_retraining_experiment_plan.md
+```
+
+## Samsung Health Cross-Device Diagnostic Artifacts
+
+Samsung Health workflow scripts:
+
+```text
+scripts/29_profile_samsung_health_core_tables.py
+scripts/30_build_samsung_sleep_episode_table.py
+scripts/31_build_samsung_pre_sleep_stage1_features.py
+scripts/32_run_samsung_pre_sleep_inference.py
+scripts/33_join_samsung_sleep_score_proxy_labels.py
+scripts/34_build_samsung_stage_based_proxy_labels.py
+scripts/35_evaluate_samsung_predictions_against_stage_proxy_labels.py
+scripts/36_diagnose_samsung_presleep_activity_coverage.py
+```
+
+Samsung Health processed data:
+
+```text
+data/processed/samsung_health/core_table_profile/samsung_health_core_table_summary.csv
+data/processed/samsung_health/core_table_profile/samsung_health_core_date_summary.csv
+data/processed/samsung_health/core_table_profile/samsung_health_core_numeric_summary.csv
+data/processed/samsung_health/core_table_profile/samsung_health_core_missing_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_sleep_episodes.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_sleep_episode_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_sleep_stage_episode_stage_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_raw_stage1_features.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_stage1_feature_mapping_report.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_stage1_feature_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_pre_sleep_predictions.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_pre_sleep_prediction_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_sleep_episodes_with_proxy_labels.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_pre_sleep_predictions_with_proxy_labels.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_pre_sleep_proxy_label_evaluation.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_sleep_score_proxy_label_match_report.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_sleep_episodes_with_stage_proxy_labels.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_stage_proxy_label_quality_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_predictions_with_stage_proxy_labels.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_stage_proxy_prediction_evaluation.csv
+data/processed/samsung_health/pre_sleep_stage1/samsung_stage_proxy_threshold_sensitivity.csv
+data/processed/samsung_health/pre_sleep_stage1/diagnostics/samsung_presleep_activity_window_coverage_summary.csv
+data/processed/samsung_health/pre_sleep_stage1/diagnostics/samsung_presleep_activity_episode_window_diagnostics.csv
+data/processed/samsung_health/pre_sleep_stage1/diagnostics/samsung_presleep_activity_source_profile.csv
+```
+
+Samsung Health reports:
+
+```text
+reports/samsung_health_core_table_profile.md
+reports/samsung_health_presleep_mapping_plan.md
+reports/samsung_sleep_episode_table_summary.md
+reports/samsung_pre_sleep_stage1_feature_build_summary.md
+reports/samsung_pre_sleep_external_prediction_summary.md
+reports/samsung_pre_sleep_external_prediction_interpretation.md
+reports/samsung_sleep_score_proxy_label_join_summary.md
+reports/samsung_sleep_score_proxy_evaluation_interpretation.md
+reports/samsung_stage_based_proxy_label_summary.md
+reports/samsung_stage_proxy_external_evaluation_report.md
+reports/samsung_to_fitbit_feature_mapping_confidence.md
+reports/samsung_to_fitbit_adapter_high_priority_improvements.md
+reports/samsung_presleep_activity_coverage_diagnostic.md
+```
+
+Samsung diagnostic conclusion:
+
+```text
+Samsung Health data were transformed into a Fitbit-compatible feature schema for cross-device transfer diagnostics.
+The workflow is not formal external validation.
+The selected Fitbit-trained MLP did not transfer reliably to Samsung stage-proxy labels.
 ```
 
 ## Smoke Test Artifacts
@@ -199,6 +328,12 @@ This artifact inventory:
 
 ```text
 reports/pre_sleep_final_artifact_inventory.md
+```
+
+One-page final summary:
+
+```text
+reports/pre_sleep_forecasting_final_one_page_summary.md
 ```
 
 ## Documentation

@@ -1,0 +1,12 @@
+﻿metric,value
+sleep_score_source_file,docs\samsunghealth\com.samsung.shealth.sleep.20260629163038.csv
+sleep_score_source_rows_with_score,1640
+episode_rows,1493
+matched_episode_rows,64
+matched_episode_rate,0.042866711319490956
+good_sleep_score_threshold,80
+max_match_time_diff_minutes,30
+proxy_positive_rate,0.078125
+mean_sleep_score,57.203125
+median_sleep_score,59.5
+median_match_time_diff_minutes,18.733333333333334

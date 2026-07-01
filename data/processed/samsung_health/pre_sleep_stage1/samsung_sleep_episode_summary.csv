@@ -1,15 +1,13 @@
 ﻿metric,value
-source_file,docs\samsunghealth\com.samsung.shealth.sleep.20260629163038.csv
-source_rows,1698
-valid_episode_rows,28
-invalid_or_filtered_rows,1670
-start_column,com.samsung.health.sleep.pkg_name
-end_column,com.samsung.health.sleep.update_time
-datauuid_column,com.samsung.health.sleep.end_time
-sleep_score_non_missing,6
-sleep_score_missing,22
-good_sleep_score_threshold,80
-proxy_label_positive_rate,1.0
-min_sleep_start_datetime,2018-11-08 23:10:00
-max_sleep_start_datetime,2025-07-05 00:43:00
-median_duration_hours_from_time,3.8422252777777777
+source_file,docs\samsunghealth\com.samsung.health.sleep_stage.20260629163038.csv
+source_stage_rows,92744
+valid_stage_rows,92744
+raw_episode_count,1642
+valid_episode_rows,1493
+invalid_or_filtered_episode_rows,149
+min_sleep_start_datetime,2021-07-30 03:40:14
+max_sleep_start_datetime,2026-06-27 03:39:00
+median_duration_hours,6.246388888888889
+mean_duration_hours,6.788186565825706
+cross_midnight_rate,0.08908238446081715
+sleep_score_joined,False
