@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import csv
+import html
 import tempfile
 import zipfile
 
@@ -42,6 +43,8 @@ SVG_DIR = PROJECT_ROOT / "design" / "svg"
 STAGE1_DIR = PROJECT_ROOT / "data" / "processed" / "samsung_health" / "pre_sleep_stage1"
 SNAPSHOT_DIR = STAGE1_DIR / "prototype_snapshots"
 PROFILE_ROOT = PROJECT_ROOT / "data" / "profiles"
+DEFAULT_UPLOAD_WORK_ROOT = PROJECT_ROOT / "_upload_work" if os.name == "nt" else Path(tempfile.gettempdir()) / "sleep_forecast_uploads"
+UPLOAD_WORK_ROOT = Path(os.getenv("UPLOAD_WORK_ROOT", str(DEFAULT_UPLOAD_WORK_ROOT)))
 PRESET_OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "pre_sleep_forecasting" / "prototype_outputs"
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "project-166d19de-1fb9-4ab5-b2f")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "deeplearnin_sleep")
@@ -88,7 +91,7 @@ SOURCE_LABELS = {
     "step_based_estimate": "걸음 기반 추정",
     "derived_count": "파생 count",
     "derived_missing_indicator": "missing indicator",
-    "missing_imputed": "imputer 보완",
+    "missing_imputed": "결측치 보완",
     "not_used_by_design_c_stage1_contract": "모델 미사용",
 }
 
@@ -125,6 +128,50 @@ def gcs_profile_prefix(profile_id: str, *parts: str) -> str:
     return "/".join(items)
 
 
+def local_path(path: Path | str) -> str:
+    resolved = Path(path).resolve()
+    text = str(resolved)
+    if os.name != "nt" or text.startswith("\\\\?\\"):
+        return text
+    if text.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + text.lstrip("\\")
+    return "\\\\?\\" + text
+
+
+def ensure_dir(path: Path) -> None:
+    os.makedirs(local_path(path), exist_ok=True)
+
+
+def copy_file(source: Path, destination: Path) -> None:
+    ensure_dir(destination.parent)
+    shutil.copy2(local_path(source), local_path(destination))
+
+
+def copy_tree(source: Path, destination: Path, *, dirs_exist_ok: bool = True) -> None:
+    ensure_dir(destination.parent)
+    shutil.copytree(local_path(source), local_path(destination), dirs_exist_ok=dirs_exist_ok)
+
+
+def remove_tree(path: Path) -> None:
+    target = Path(path).resolve()
+    allowed_roots = [PROJECT_ROOT.resolve(), UPLOAD_WORK_ROOT.resolve(), PROFILE_ROOT.resolve()]
+    if not any(target == root or root in target.parents for root in allowed_roots):
+        raise ValueError(f"Refusing to remove path outside project workspace: {target}")
+    if os.path.exists(local_path(target)):
+        shutil.rmtree(local_path(target))
+
+
+def read_text_file(path: Path) -> str:
+    with open(local_path(path), "r", encoding="utf-8-sig", errors="ignore") as handle:
+        return handle.read()
+
+
+def write_text_file(path: Path, text: str) -> None:
+    ensure_dir(path.parent)
+    with open(local_path(path), "w", encoding="utf-8-sig") as handle:
+        handle.write(text)
+
+
 @st.cache_resource(show_spinner=False)
 def gcs_bucket():
     if storage is None or not GCS_BUCKET_NAME:
@@ -140,14 +187,26 @@ def gcs_available() -> bool:
     return gcs_bucket() is not None
 
 
+def gcs_status_message() -> str:
+    if storage is None:
+        return "GCS 연결 불가: google-cloud-storage 패키지를 불러오지 못했습니다."
+    if not GCS_BUCKET_NAME:
+        return "GCS 연결 불가: GCS_BUCKET_NAME이 비어 있습니다."
+    try:
+        storage.Client(project=GCP_PROJECT_ID).bucket(GCS_BUCKET_NAME)
+    except Exception as exc:
+        return f"GCS 연결 불가: {type(exc).__name__}: {exc}"
+    return f"GCS 연결 준비됨: gs://{GCS_BUCKET_NAME}"
+
+
 def gcs_blob_exists(blob_name: str) -> bool:
     bucket = gcs_bucket()
     if bucket is None:
-        return False
+        raise RuntimeError(gcs_status_message())
     try:
         return bucket.blob(blob_name).exists()
-    except Exception:
-        return False
+    except Exception as exc:
+        raise RuntimeError(f"GCS 객체 확인 실패: {type(exc).__name__}: {exc}") from exc
 
 
 def gcs_download_text(blob_name: str) -> str | None:
@@ -170,19 +229,19 @@ def gcs_upload_text(blob_name: str, text: str, content_type: str = "application/
     bucket.blob(blob_name).upload_from_string(text, content_type=content_type)
 
 
-def gcs_upload_file(local_path: Path, blob_name: str) -> None:
+def gcs_upload_file(source_path: Path, blob_name: str) -> None:
     bucket = gcs_bucket()
     if bucket is None:
         raise RuntimeError("GCS bucket is not available")
-    bucket.blob(blob_name).upload_from_filename(str(local_path))
+    bucket.blob(blob_name).upload_from_filename(local_path(source_path))
 
 
-def gcs_download_file(blob_name: str, local_path: Path) -> None:
+def gcs_download_file(blob_name: str, destination_path: Path) -> None:
     bucket = gcs_bucket()
     if bucket is None:
         raise RuntimeError("GCS bucket is not available")
-    local_path.parent.mkdir(parents=True, exist_ok=True)
-    bucket.blob(blob_name).download_to_filename(str(local_path))
+    ensure_dir(destination_path.parent)
+    bucket.blob(blob_name).download_to_filename(local_path(destination_path))
 
 
 def gcs_delete_prefix(prefix: str) -> None:
@@ -204,20 +263,22 @@ def gcs_upload_directory(local_dir: Path, prefix: str) -> int:
     return uploaded
 
 
-def gcs_download_prefix(prefix: str, local_dir: Path) -> int:
+def gcs_download_prefix(prefix: str, local_dir: Path, suffixes: tuple[str, ...] | None = None) -> int:
     bucket = gcs_bucket()
     if bucket is None:
         raise RuntimeError("GCS bucket is not available")
-    local_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(local_dir)
     count = 0
     base = prefix.rstrip("/") + "/"
     for blob in bucket.list_blobs(prefix=base):
         if blob.name.endswith("/"):
             continue
+        if suffixes and not blob.name.lower().endswith(suffixes):
+            continue
         rel = blob.name[len(base) :]
         target = local_dir / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        blob.download_to_filename(str(target))
+        ensure_dir(target.parent)
+        blob.download_to_filename(local_path(target))
         count += 1
     return count
 
@@ -225,11 +286,13 @@ def gcs_download_prefix(prefix: str, local_dir: Path) -> int:
 def prepare_profile_work_dir(profile_id: str) -> Path:
     safe_id = safe_profile_id(profile_id)
     work_dir = Path(tempfile.gettempdir()) / "sleep_forecast_profiles" / safe_id / "raw_export"
+    if work_dir.exists() and any(work_dir.rglob("*.csv")):
+        return work_dir
     if work_dir.exists():
         shutil.rmtree(work_dir)
     if gcs_available():
         try:
-            gcs_download_prefix(gcs_profile_prefix(safe_id, "raw_export"), work_dir)
+            gcs_download_prefix(gcs_profile_prefix(safe_id, "raw_export"), work_dir, suffixes=(".csv",))
             return work_dir
         except Exception:
             pass
@@ -330,7 +393,7 @@ def list_profile_ids() -> list[str]:
 
 
 def safe_extract_zip(zip_path: Path, target_dir: Path) -> list[Path]:
-    target_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(target_dir)
     extracted: list[Path] = []
     root = target_dir.resolve()
     with zipfile.ZipFile(zip_path) as archive:
@@ -343,8 +406,8 @@ def safe_extract_zip(zip_path: Path, target_dir: Path) -> list[Path]:
             destination = (target_dir / member_name).resolve()
             if not str(destination).startswith(str(root)):
                 continue
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            with archive.open(member) as src, destination.open("wb") as dst:
+            ensure_dir(destination.parent)
+            with archive.open(member) as src, open(local_path(destination), "wb") as dst:
                 shutil.copyfileobj(src, dst)
             extracted.append(destination)
     return extracted
@@ -361,16 +424,15 @@ def detected_export_root(extracted_dir: Path) -> Path:
 
 def merge_samsung_csv(existing_path: Path, incoming_path: Path) -> int:
     if not existing_path.exists():
-        existing_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(incoming_path, existing_path)
-        return max(0, len(incoming_path.read_text(encoding="utf-8-sig", errors="ignore").splitlines()) - 2)
+        copy_file(incoming_path, existing_path)
+        return max(0, len(read_text_file(incoming_path).splitlines()) - 2)
 
-    existing_lines = existing_path.read_text(encoding="utf-8-sig", errors="ignore").splitlines()
-    incoming_lines = incoming_path.read_text(encoding="utf-8-sig", errors="ignore").splitlines()
+    existing_lines = read_text_file(existing_path).splitlines()
+    incoming_lines = read_text_file(incoming_path).splitlines()
     if len(incoming_lines) <= 2:
         return 0
     if len(existing_lines) < 2:
-        shutil.copy2(incoming_path, existing_path)
+        copy_file(incoming_path, existing_path)
         return max(0, len(incoming_lines) - 2)
 
     header = existing_lines[:2]
@@ -380,29 +442,42 @@ def merge_samsung_csv(existing_path: Path, incoming_path: Path) -> int:
     if not added_rows:
         return 0
     merged = header + existing_rows + added_rows
-    existing_path.write_text("\n".join(merged) + "\n", encoding="utf-8-sig")
+    write_text_file(existing_path, "\n".join(merged) + "\n")
     return len(added_rows)
 
 
-def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
+def parse_gcs_zip_reference(value: str) -> tuple[str, str]:
+    text = value.strip()
+    if not text:
+        raise ValueError("GCS ZIP 경로를 입력하세요.")
+    if text.startswith("gs://"):
+        without_scheme = text[5:]
+        bucket_name, _, blob_name = without_scheme.partition("/")
+        if not bucket_name or not blob_name:
+            raise ValueError("GCS 경로는 gs://bucket/path/file.zip 형식이어야 합니다.")
+        return bucket_name, blob_name
+    return GCS_BUCKET_NAME, text.lstrip("/")
+
+
+def apply_zip_path_to_profile(
+    zip_path: Path,
+    zip_name: str,
+    profile_id: str,
+    mode: str,
+    *,
+    source_uri: str | None = None,
+) -> dict:
     safe_id = safe_profile_id(profile_id)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    local_base = Path(tempfile.gettempdir()) / "sleep_forecast_uploads" / safe_id / timestamp
-    if local_base.exists():
-        shutil.rmtree(local_base)
-    local_base.mkdir(parents=True, exist_ok=True)
-
-    zip_path = local_base / f"{timestamp}_{Path(uploaded_file.name).name}"
-    zip_path.write_bytes(uploaded_file.getbuffer())
+    local_base = zip_path.parent
 
     if gcs_available():
         gcs_upload_file(zip_path, gcs_profile_prefix(safe_id, "inbox", zip_path.name))
     else:
-        profile_dir(safe_id).mkdir(parents=True, exist_ok=True)
-        profile_inbox_dir(safe_id).mkdir(parents=True, exist_ok=True)
-        profile_imports_dir(safe_id).mkdir(parents=True, exist_ok=True)
-        shutil.copy2(zip_path, profile_inbox_dir(safe_id) / zip_path.name)
+        ensure_dir(profile_dir(safe_id))
+        ensure_dir(profile_inbox_dir(safe_id))
+        ensure_dir(profile_imports_dir(safe_id))
+        copy_file(zip_path, profile_inbox_dir(safe_id) / zip_path.name)
 
     import_dir = local_base / "import"
     extracted_dir = import_dir / "extracted"
@@ -412,25 +487,24 @@ def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
 
     if mode == "전체 교체":
         if raw_dir.exists():
-            shutil.rmtree(raw_dir)
-        raw_dir.mkdir(parents=True, exist_ok=True)
+            remove_tree(raw_dir)
+        ensure_dir(raw_dir)
         copied = 0
         for source in extracted_files:
             rel = source.relative_to(export_root) if source.is_relative_to(export_root) else source.relative_to(extracted_dir)
             destination = raw_dir / rel
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
+            copy_file(source, destination)
             copied += 1
         added_rows = 0
     else:
-        raw_dir.mkdir(parents=True, exist_ok=True)
+        ensure_dir(raw_dir)
         if gcs_available():
             try:
-                gcs_download_prefix(gcs_profile_prefix(safe_id, "raw_export"), raw_dir)
+                gcs_download_prefix(gcs_profile_prefix(safe_id, "raw_export"), raw_dir, suffixes=(".csv",))
             except Exception:
                 pass
         elif profile_raw_dir(safe_id).exists():
-            shutil.copytree(profile_raw_dir(safe_id), raw_dir, dirs_exist_ok=True)
+            copy_tree(profile_raw_dir(safe_id), raw_dir)
         copied = 0
         added_rows = 0
         for source in extracted_files:
@@ -439,8 +513,7 @@ def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
             if source.suffix.lower() == ".csv":
                 added_rows += merge_samsung_csv(destination, source)
             else:
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, destination)
+                copy_file(source, destination)
             copied += 1
 
     if gcs_available():
@@ -451,13 +524,13 @@ def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
     else:
         final_raw_dir = profile_raw_dir(safe_id)
         if mode == "전체 교체" and final_raw_dir.exists():
-            shutil.rmtree(final_raw_dir)
-        final_raw_dir.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(raw_dir, final_raw_dir, dirs_exist_ok=True)
+            remove_tree(final_raw_dir)
+        ensure_dir(final_raw_dir.parent)
+        copy_tree(raw_dir, final_raw_dir)
         local_import_dir = profile_imports_dir(safe_id) / timestamp / "extracted"
         if local_import_dir.exists():
-            shutil.rmtree(local_import_dir)
-        shutil.copytree(extracted_dir, local_import_dir, dirs_exist_ok=True)
+            remove_tree(local_import_dir)
+        copy_tree(extracted_dir, local_import_dir)
 
     manifest = load_profile_manifest(safe_id)
     manifest["profile_id"] = safe_id
@@ -468,8 +541,8 @@ def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
         {
             "timestamp": timestamp,
             "mode": mode,
-            "zip_name": uploaded_file.name,
-            "zip_path": f"gs://{GCS_BUCKET_NAME}/{gcs_profile_prefix(safe_id, 'inbox', zip_path.name)}" if gcs_available() else str(profile_inbox_dir(safe_id) / zip_path.name),
+            "zip_name": zip_name,
+            "zip_path": source_uri or (f"gs://{GCS_BUCKET_NAME}/{gcs_profile_prefix(safe_id, 'inbox', zip_path.name)}" if gcs_available() else str(profile_inbox_dir(safe_id) / zip_path.name)),
             "extracted_files": len(extracted_files),
             "applied_files": copied,
             "added_csv_rows": added_rows,
@@ -485,6 +558,40 @@ def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
         "added_csv_rows": added_rows,
         "zip_path": zip_path,
     }
+
+
+def apply_zip_to_profile(uploaded_file, profile_id: str, mode: str) -> dict:
+    safe_id = safe_profile_id(profile_id)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    local_base = UPLOAD_WORK_ROOT / safe_id / timestamp
+    if local_base.exists():
+        remove_tree(local_base)
+    ensure_dir(local_base)
+
+    zip_path = local_base / f"{timestamp}_{Path(uploaded_file.name).name}"
+    with open(local_path(zip_path), "wb") as handle:
+        handle.write(uploaded_file.getbuffer())
+    return apply_zip_path_to_profile(zip_path, uploaded_file.name, safe_id, mode)
+
+
+def apply_gcs_zip_to_profile(gcs_reference: str, profile_id: str, mode: str) -> dict:
+    bucket_name, blob_name = parse_gcs_zip_reference(gcs_reference)
+    if bucket_name != GCS_BUCKET_NAME:
+        raise ValueError(f"현재 앱 버킷({GCS_BUCKET_NAME})의 ZIP만 바로 반영할 수 있습니다.")
+    if not gcs_blob_exists(blob_name):
+        raise FileNotFoundError(f"GCS ZIP을 찾을 수 없습니다: gs://{bucket_name}/{blob_name}")
+
+    safe_id = safe_profile_id(profile_id)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    local_base = UPLOAD_WORK_ROOT / safe_id / timestamp
+    if local_base.exists():
+        remove_tree(local_base)
+    ensure_dir(local_base)
+
+    zip_name = Path(blob_name).name or f"{timestamp}_upload.zip"
+    zip_path = local_base / f"{timestamp}_{zip_name}"
+    gcs_download_file(blob_name, zip_path)
+    return apply_zip_path_to_profile(zip_path, zip_name, safe_id, mode, source_uri=f"gs://{bucket_name}/{blob_name}")
 
 
 @st.cache_resource
@@ -650,10 +757,12 @@ def dataset_status(data_dir: Path) -> pd.DataFrame:
 
 def run_pipeline(data_dir: Path) -> list[dict]:
     env = os.environ.copy()
+    env["PROJECT_ROOT"] = str(PROJECT_ROOT)
     env["SAMSUNG_HEALTH_DIR"] = str(data_dir)
 
     results = []
     for step_name, script in PIPELINE_STEPS:
+        print(f"[pipeline] start step={step_name} script={script} data_dir={data_dir}", flush=True)
         completed = subprocess.run(
             [sys.executable, script],
             cwd=PROJECT_ROOT,
@@ -672,6 +781,12 @@ def run_pipeline(data_dir: Path) -> list[dict]:
                 "stderr": completed.stderr,
             }
         )
+        print(
+            f"[pipeline] end step={step_name} returncode={completed.returncode}\n"
+            f"[pipeline] stdout:\n{completed.stdout[-4000:]}\n"
+            f"[pipeline] stderr:\n{completed.stderr[-4000:]}",
+            flush=True,
+        )
         if completed.returncode != 0:
             break
     return results
@@ -679,7 +794,9 @@ def run_pipeline(data_dir: Path) -> list[dict]:
 
 def run_command_step(step_name: str, command: list[str], data_dir: Path) -> dict:
     env = os.environ.copy()
+    env["PROJECT_ROOT"] = str(PROJECT_ROOT)
     env["SAMSUNG_HEALTH_DIR"] = str(data_dir)
+    print(f"[command-step] start step={step_name} command={' '.join(command)} data_dir={data_dir}", flush=True)
     completed = subprocess.run(
         command,
         cwd=PROJECT_ROOT,
@@ -688,6 +805,12 @@ def run_command_step(step_name: str, command: list[str], data_dir: Path) -> dict
         text=True,
         encoding="utf-8",
         errors="replace",
+    )
+    print(
+        f"[command-step] end step={step_name} returncode={completed.returncode}\n"
+        f"[command-step] stdout:\n{completed.stdout[-4000:]}\n"
+        f"[command-step] stderr:\n{completed.stderr[-4000:]}",
+        flush=True,
     )
     return {
         "step": step_name,
@@ -1012,7 +1135,7 @@ def run_today_forecast_pipeline(
     write_today_target_episode(sleep_start)
     results.append(
         run_command_step(
-            "오늘 밤 target feature 생성",
+            "오늘 밤 예측 대상 특성 생성",
             [
                 sys.executable,
                 "scripts/31_build_samsung_pre_sleep_stage1_features.py",
@@ -1036,7 +1159,7 @@ def run_today_forecast_pipeline(
     shutil.copy2(TODAY_RAW_FEATURE_PATH, TODAY_SAMSUNG_ONLY_RAW_FEATURE_PATH)
     results.append(
         run_command_step(
-            "Samsung-only 기준 MLP 예측",
+            "Samsung 단독 기준 MLP 예측",
             run_today_inference_step(
                 TODAY_SAMSUNG_ONLY_RAW_FEATURE_PATH,
                 TODAY_SAMSUNG_ONLY_PREDICTION_PATH,
@@ -1078,7 +1201,7 @@ def run_today_forecast_pipeline(
         if comparison_path is not None:
             results.append(
                 {
-                    "step": "Samsung-only 대비 최종 예측 비교 저장",
+                    "step": "Samsung 단독 대비 최종 예측 비교 저장",
                     "script": str(comparison_path),
                     "returncode": 0,
                     "stdout": f"comparison: {comparison_path}",
@@ -1089,7 +1212,7 @@ def run_today_forecast_pipeline(
         if snapshot_path is not None:
             results.append(
                 {
-                    "step": "오늘 밤 예측 snapshot 저장",
+                    "step": "오늘 밤 예측 스냅샷 저장",
                     "script": str(snapshot_path),
                     "returncode": 0,
                     "stdout": f"snapshot: {snapshot_path}",
@@ -1116,7 +1239,7 @@ def probability_band(probability: float) -> str:
     if probability >= 0.64:
         return "상대적으로 높음"
     if probability >= 0.54:
-        return "threshold 이상"
+        return "기준값 이상"
     if probability >= 0.44:
         return "경계 구간"
     return "낮음"
@@ -1259,10 +1382,10 @@ def summarize_today_feature_coverage(raw_feature_df: pd.DataFrame) -> tuple[pd.D
         summary[f"{group_key}_present"] += int(present)
         rows.append(
             {
-                "feature_group": "이력/baseline" if group == "history" else "오늘 현재 wearable",
+                "feature_group": "이력 기준" if group == "history" else "오늘 현재 웨어러블",
                 "display_name": label,
                 "feature": feature,
-                "status": "반영됨" if present else "누락/imputer",
+                "status": "반영됨" if present else "누락/결측 보완",
                 "value": value if present else "",
             }
         )
@@ -2633,6 +2756,24 @@ def render_dashboard_upload_controls(profile_id: str) -> None:
                     horizontal=True,
                     key=f"profile_zip_mode_{safe_id}",
                 )
+                st.caption("Cloud Run에서는 큰 ZIP 브라우저 업로드가 413으로 막힐 수 있습니다. 32MB 이상이면 GCS 경로 반영을 사용하세요.")
+                gcs_zip_reference = ""
+                with st.expander("큰 ZIP은 GCS 경로로 반영", expanded=False):
+                    gcs_ready = gcs_available()
+                    st.caption(gcs_status_message())
+                    if not gcs_ready:
+                        st.warning("GCS 연결이 준비되지 않았습니다. 경로는 입력할 수 있지만, 반영 버튼을 누르면 연결 오류가 표시됩니다.")
+                    gcs_zip_reference = st.text_input(
+                        "GCS ZIP 경로",
+                        placeholder=f"gs://{GCS_BUCKET_NAME}/uploads/samsunghealth_export.zip",
+                        key=f"profile_gcs_zip_reference_{safe_id}",
+                    )
+                    gcs_apply_clicked = st.button(
+                        "GCS ZIP 반영",
+                        type="secondary",
+                        key=f"profile_gcs_zip_apply_{safe_id}",
+                        disabled=not gcs_zip_reference.strip(),
+                    )
                 apply_clicked = False
                 if uploaded_zip is not None:
                     apply_clicked = st.button("ZIP 반영", type="primary", key=f"profile_zip_apply_{safe_id}")
@@ -2655,6 +2796,25 @@ def render_dashboard_upload_controls(profile_id: str) -> None:
                         st.error("ZIP 파일을 열 수 없습니다. Samsung Health export ZIP인지 확인하세요.")
                     except Exception as exc:
                         st.error(f"ZIP 반영 실패: {exc}")
+                if gcs_apply_clicked:
+                    try:
+                        result = apply_gcs_zip_to_profile(gcs_zip_reference, safe_id, import_mode)
+                        st.session_state["active_profile_id"] = safe_id
+                        st.session_state[f"profile_zip_state_{safe_id}"] = {
+                            "status": "done",
+                            "imported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "mode": result["mode"],
+                            "applied_files": result["applied_files"],
+                            "added_csv_rows": result["added_csv_rows"],
+                        }
+                        st.success(
+                            f"GCS ZIP {result['mode']} 완료: 파일 {result['applied_files']:,}개 반영"
+                            + (f", 신규 CSV row {result['added_csv_rows']:,}개" if result["mode"] != "전체 교체" else "")
+                        )
+                    except zipfile.BadZipFile:
+                        st.error("GCS ZIP 파일을 열 수 없습니다. Samsung Health export ZIP인지 확인하세요.")
+                    except Exception as exc:
+                        st.error(f"GCS ZIP 반영 실패: {exc}")
 
             with status_col:
                 upload_ready = uploaded_zip is not None
@@ -2753,20 +2913,116 @@ def render_overview_tab(
         if not deltas.empty:
             delta_text = format_delta(float(deltas.iloc[0]))
 
-    probability_label = latest_state if latest_state != "예측 없음" else "Moderate likelihood"
+    probability_label = latest_state if latest_state != "예측 없음" else "보통 가능성"
     pred_text = forecast_sentence(latest_target, latest_prob, latest_pred)
     episode_count = int(summary.get("rows", 0))
     snapshot_delta = delta_text if delta_text != "-" else "+4.8%p"
     dashboard_target = forecast_subject(latest_target)
     target_sleep_text = latest_target if latest_target != "-" else "23:30"
     input_summary = today_input_summary_values(target_sleep_text)
-    interpretation_band = latest_state if latest_state != "예측 없음" else "Moderate"
+    interpretation_band = latest_state if latest_state != "예측 없음" else "보통"
     if "높" in interpretation_band or interpretation_band.lower().startswith("good"):
         band_class = "accent-green"
     elif "낮" in interpretation_band or "못" in interpretation_band:
         band_class = "accent-red"
     else:
         band_class = "accent-amber"
+
+    feature_summary_df = load_csv_if_exists(TODAY_FEATURE_SUMMARY_PATH)
+    if not feature_summary_df.empty and {"non_missing_count", "missing_count"}.issubset(feature_summary_df.columns):
+        non_missing_counts = pd.to_numeric(feature_summary_df["non_missing_count"], errors="coerce").fillna(0)
+        missing_counts = pd.to_numeric(feature_summary_df["missing_count"], errors="coerce").fillna(0)
+        total_features = int(len(feature_summary_df))
+        direct_features = int((non_missing_counts > 0).sum())
+        missing_features = int((missing_counts > 0).sum())
+    else:
+        raw_feature_df = load_csv_if_exists(TODAY_RAW_FEATURE_PATH)
+        _, overview_coverage = summarize_today_feature_coverage(raw_feature_df)
+        direct_features = int(overview_coverage["history_present"] + overview_coverage["current_present"])
+        total_features = int(overview_coverage["history_total"] + overview_coverage["current_total"])
+        missing_features = max(0, total_features - direct_features)
+    direct_pct = (direct_features / total_features * 100) if total_features else 0.0
+    missing_pct = (missing_features / total_features * 100) if total_features else 0.0
+    feature_completeness_rows = f"""
+      <div class="feature-row"><div class="feature-label">{svg_icon("cube-svgrepo-com.svg", "nav-icon", "#38BDF8")} 전체 특성</div><div class="feature-progress"><div class="bar"><span style="width: 100%; background: var(--primary);"></span></div></div><b>{total_features}</b></div>
+      <div class="feature-row"><div class="feature-label">{svg_icon("check-circle-1-svgrepo-com.svg", "nav-icon", "#22C55E")} 직접 관측 / 입력</div><div class="feature-progress"><div class="bar"><span style="width: {direct_pct:.1f}%; background: #2DD4BF;"></span></div></div><b>{direct_features}</b></div>
+      <div class="feature-row"><div class="feature-label">{svg_icon("puzzle-svgrepo-com.svg", "nav-icon", "#8B5CF6")} 결측치 보완</div><div class="feature-progress"><div class="bar"><span style="width: {missing_pct:.1f}%; background: var(--sleep-purple);"></span></div></div><b>{missing_features}</b></div>
+      <div class="feature-row"><div class="feature-label">{svg_icon("warning-triangle-svgrepo-com.svg", "nav-icon", "#F59E0B")} 결측 비율</div><div class="feature-progress"><div class="bar"><span style="width: {missing_pct:.1f}%; background: var(--warning);"></span></div></div><b class="accent-amber">{missing_pct:.1f}%</b></div>
+"""
+
+    scenario_items: list[dict[str, object]] = []
+    base_probability = latest_prob if latest_prob is not None else None
+    sensitivity_df = load_csv_if_exists(TODAY_NUMERIC_SENSITIVITY_PATH)
+    if not sensitivity_df.empty and {"description", "good_sleep_probability"}.issubset(sensitivity_df.columns):
+        sensitivity_df = sensitivity_df.copy()
+        sensitivity_df["good_sleep_probability"] = pd.to_numeric(
+            sensitivity_df["good_sleep_probability"], errors="coerce"
+        )
+        if "probability_delta" in sensitivity_df.columns:
+            sensitivity_df["probability_delta"] = pd.to_numeric(
+                sensitivity_df["probability_delta"], errors="coerce"
+            ).fillna(0)
+        else:
+            sensitivity_df["probability_delta"] = 0.0
+        sensitivity_df = sensitivity_df.dropna(subset=["good_sleep_probability"])
+        baseline_rows = (
+            sensitivity_df[sensitivity_df["scenario_id"].astype(str).eq("baseline")]
+            if "scenario_id" in sensitivity_df.columns
+            else pd.DataFrame()
+        )
+        if not baseline_rows.empty:
+            base_probability = float(baseline_rows.iloc[0]["good_sleep_probability"])
+        scenario_candidates = sensitivity_df
+        if "scenario_id" in scenario_candidates.columns:
+            scenario_candidates = scenario_candidates[
+                ~scenario_candidates["scenario_id"].astype(str).eq("baseline")
+            ]
+        scenario_candidates = scenario_candidates.assign(
+            abs_delta=scenario_candidates["probability_delta"].abs()
+        ).sort_values(["abs_delta", "good_sleep_probability"], ascending=[False, False])
+        for _, scenario in scenario_candidates.head(3).iterrows():
+            delta = float(scenario.get("probability_delta", 0) or 0)
+            scenario_items.append(
+                {
+                    "label": str(scenario.get("description", "시나리오")),
+                    "probability": float(scenario["good_sleep_probability"]),
+                    "delta": delta,
+                }
+            )
+    if base_probability is None:
+        base_probability = 0.0
+    scenario_items.insert(0, {"label": "현재 입력", "probability": base_probability, "delta": 0.0})
+
+    scenario_icons = [
+        svg_icon("star-svgrepo-com.svg", "nav-icon", "#38BDF8"),
+        svg_icon("trending-up-svgrepo-com.svg", "nav-icon", "#22C55E"),
+        svg_icon("fire-svgrepo-com.svg", "nav-icon", "#F59E0B"),
+        svg_icon("heart-rate-svgrepo-com.svg", "nav-icon", "#EF4444"),
+    ]
+    scenario_rows = []
+    for index, item in enumerate(scenario_items[:4]):
+        scenario_probability = float(item["probability"])
+        scenario_pct = max(0.0, min(100.0, scenario_probability * 100))
+        delta = float(item.get("delta", 0.0) or 0.0)
+        if index == 0:
+            color = "var(--primary)"
+            value_class = ""
+        elif delta >= 0:
+            color = "var(--success)"
+            value_class = "accent-green"
+        else:
+            color = "var(--danger)"
+            value_class = "accent-red"
+        label = html.escape(str(item["label"]))
+        scenario_rows.append(
+            f"""      <div class="scenario-row"><span>{scenario_icons[min(index, len(scenario_icons) - 1)]} {label}</span><div class="bar"><span style="width: {scenario_pct:.1f}%; background: {color};"></span></div><b class="{value_class}">{scenario_pct:.1f}%</b></div>"""
+        )
+    scenario_rows_html = "\n".join(scenario_rows)
+    scenario_help_text = (
+        "저장된 수치 민감도 결과에서 변화폭이 큰 시나리오를 표시합니다."
+        if not sensitivity_df.empty
+        else "수치 민감도 생성 후 실제 시나리오 결과가 표시됩니다."
+    )
 
     render_html(
         f"""
@@ -2775,12 +3031,12 @@ def render_overview_tab(
     <div class="sleep-hero-content">
       <div class="hero-copy">
         <h2>오늘 밤 수면 예측</h2>
-        <p>Samsung Health + 일부 입력 기반 live inference prototype</p>
+        <p>Samsung Health와 일부 입력 기반 실시간 예측 프로토타입</p>
         <p>{pred_text}</p>
         <div class="hero-script">{dashboard_target}, 당신의 잠을 예측해요</div>
       </div>
       <div class="probability-card">
-        <div>Good Sleep Probability</div>
+        <div>좋은 수면 확률</div>
         <div class="ring-wrap">
           <div>
             <div class="probability-value">{latest_probability_pct}</div>
@@ -2795,43 +3051,37 @@ def render_overview_tab(
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-icon accent-purple">{svg_icon("stack-svgrepo-com.svg", color="#8B5CF6")}</div>
-      <div><div class="kpi-title">Episodes</div><div class="kpi-value">{episode_count:,}</div></div>
+      <div><div class="kpi-title">예측 건수</div><div class="kpi-value">{episode_count:,}</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon">{svg_icon("document-filled-svgrepo-com.svg", color="#38BDF8")}</div>
-      <div><div class="kpi-title">Samsung Files</div><div class="kpi-value">{file_counts['total']:,}</div></div>
+      <div><div class="kpi-title">Samsung 파일</div><div class="kpi-value">{file_counts['total']:,}</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon accent-green">{svg_icon("trending-up-svgrepo-com.svg", color="#22C55E")}</div>
-      <div><div class="kpi-title">Snapshot Delta</div><div class="kpi-value accent-green">{snapshot_delta}</div></div>
+      <div><div class="kpi-title">스냅샷 변화</div><div class="kpi-value accent-green">{snapshot_delta}</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon accent-amber">{svg_icon("shield-check-svgrepo-com.svg", color="#F59E0B")}</div>
-      <div><div class="kpi-title">Interpretation Band</div><div class="kpi-value {band_class}">{interpretation_band}</div></div>
+      <div><div class="kpi-title">해석 구간</div><div class="kpi-value {band_class}">{interpretation_band}</div></div>
     </div>
   </div>
 
   <div class="lower-grid">
     <div class="panel-card">
-      <div class="panel-title">{svg_icon("puzzle-svgrepo-com.svg", "nav-icon", "#8B5CF6")} Feature Completeness</div>
-      <div class="feature-row"><div class="feature-label">{svg_icon("cube-svgrepo-com.svg", "nav-icon", "#38BDF8")} 원본 feature</div><div class="feature-progress"><div class="bar"><span style="width: 100%; background: var(--primary);"></span></div></div><b>70</b></div>
-      <div class="feature-row"><div class="feature-label">{svg_icon("check-circle-1-svgrepo-com.svg", "nav-icon", "#22C55E")} 직접 입력 / 파생</div><div class="feature-progress"><div class="bar"><span style="width: 44.3%; background: #2DD4BF;"></span></div></div><b>31</b></div>
-      <div class="feature-row"><div class="feature-label">{svg_icon("puzzle-svgrepo-com.svg", "nav-icon", "#8B5CF6")} Imputer 보완</div><div class="feature-progress"><div class="bar"><span style="width: 55.7%; background: var(--sleep-purple);"></span></div></div><b>39</b></div>
-      <div class="feature-row"><div class="feature-label">{svg_icon("warning-triangle-svgrepo-com.svg", "nav-icon", "#F59E0B")} 결측 비율</div><div class="feature-progress"><div class="bar"><span style="width: 55.7%; background: var(--warning);"></span></div></div><b class="accent-amber">55.7%</b></div>
+      <div class="panel-title">{svg_icon("puzzle-svgrepo-com.svg", "nav-icon", "#8B5CF6")} 특성 완성도</div>
+{feature_completeness_rows}
     </div>
 
     <div class="panel-card">
-      <div class="panel-title">{svg_icon("scales-svgrepo-com.svg", "nav-icon", "#38BDF8")} Scenario Comparison</div>
-      <div class="scenario-row"><span>{svg_icon("star-svgrepo-com.svg", "nav-icon", "#38BDF8")} 기본 상태</span><div class="bar"><span style="width: 64.2%; background: var(--primary);"></span></div><b>{latest_probability_pct}</b></div>
-      <div class="scenario-row"><span>{svg_icon("trending-up-svgrepo-com.svg", "nav-icon", "#22C55E")} 낮 활동량 증가</span><div class="bar"><span style="width: 71.8%; background: var(--success);"></span></div><b>71.8%</b></div>
-      <div class="scenario-row"><span>{svg_icon("fire-svgrepo-com.svg", "nav-icon", "#F59E0B")} 취침 전 식사 불량</span><div class="bar"><span style="width: 49.6%; background: var(--warning);"></span></div><b>49.6%</b></div>
-      <div class="scenario-row"><span>{svg_icon("heart-rate-svgrepo-com.svg", "nav-icon", "#EF4444")} 활동량 낮고 회복 높음</span><div class="bar"><span style="width: 42.3%; background: var(--danger);"></span></div><b class="accent-red">42.3%</b></div>
-      <div class="small-label">동일한 기본 입력에서 활동량 / 칼로리 / 심박 preset을 바꿔 비교합니다.</div>
+      <div class="panel-title">{svg_icon("scales-svgrepo-com.svg", "nav-icon", "#38BDF8")} 시나리오 비교</div>
+{scenario_rows_html}
+      <div class="small-label">{scenario_help_text}</div>
     </div>
 
     <div>
       <div class="panel-card">
-        <div class="panel-title">Input Summary</div>
+        <div class="panel-title">입력 요약</div>
         <div class="summary-row"><span>{svg_icon("clock-five-svgrepo-com.svg", "nav-icon", "#818CF8")} 예상 취침 시간</span><b>{input_summary["target_sleep"]}</b></div>
         <div class="summary-row"><span>{masked_svg_icon("footprint-svgrepo-com.svg", "nav-icon", "#22C55E")} 어제 총 걸음 수</span><b>{input_summary["previous_steps"]}</b></div>
         <div class="summary-row"><span>{svg_icon("shoe-svgrepo-com.svg", "nav-icon", "#38BDF8")} 취침 전 누적 걸음 수</span><b>{input_summary["pre_sleep_steps"]}</b></div>
@@ -2847,7 +3097,7 @@ def render_overview_tab(
 
     render_dashboard_upload_controls(profile_id)
 
-    with st.expander("Raw Feature Table / Debug", expanded=False):
+    with st.expander("원본 특성 테이블 / 디버그", expanded=False):
         left, right = st.columns([1.2, 1])
         with left:
             st.subheader("최근 예측")
@@ -2883,13 +3133,13 @@ def render_overview_tab(
 <div><b>최신 Samsung 데이터</b></div>
 <div class="small-label">{freshness_summary['latest_dataset'] or '-'} {freshness_summary['latest_data_time'] or '-'}</div>
 <br />
-<div><b>최신 feature 반영</b></div>
+<div><b>최신 특성 반영</b></div>
 <div class="small-label">이력/baseline {coverage_summary['history_present']} / {coverage_summary['history_total']}, 오늘 wearable {coverage_summary['current_present']} / {coverage_summary['current_total']}</div>
 <br />
 <div><b>모델</b></div>
-<div class="small-label">Fitbit-trained Design C Stage 1 PyTorch MLP, threshold 0.54</div>
+<div class="small-label">Fitbit 학습 기반 Design C Stage 1 PyTorch MLP, 기준값 0.54</div>
 <br />
-<div><b>sleep_episode_id</b></div>
+<div><b>수면 에피소드 ID</b></div>
 <div class="small-label">{latest_episode}</div>
 </div>
 """,
@@ -2991,7 +3241,7 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
     threshold = float(row["threshold"])
     probability_pct = f"{probability * 100:.1f}%"
     ring_pct = max(0.0, min(100.0, probability * 100))
-    label_text = "Good" if pred == 1 else "Not good"
+    label_text = "좋은 수면" if pred == 1 else "기준 미달"
     raw_feature_df = load_csv_if_exists(TODAY_RAW_FEATURE_PATH)
     coverage_df, coverage_summary = summarize_today_feature_coverage(raw_feature_df)
     direct_count = int(coverage_summary["history_present"] + coverage_summary["current_present"])
@@ -3004,15 +3254,15 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
         f"""
 <div class="live-result-grid">
   <div class="panel-card">
-    <div class="panel-title">{svg_icon("puzzle-svgrepo-com.svg", "nav-icon", "#8B5CF6")} Feature Completeness</div>
-    <div class="feature-row"><div class="feature-label">Direct / observed</div><div class="feature-progress"><div class="bar"><span style="width: {direct_pct:.1f}%; background: var(--primary);"></span></div></div><b>{direct_count}</b></div>
-    <div class="feature-row"><div class="feature-label">Imputer filled</div><div class="feature-progress"><div class="bar"><span style="width: {missing_pct:.1f}%; background: var(--sleep-purple);"></span></div></div><b>{missing_count}</b></div>
-    <div class="feature-row"><div class="feature-label">Missing ratio</div><div class="feature-progress"><div class="bar"><span style="width: {missing_pct:.1f}%; background: var(--warning);"></span></div></div><b class="accent-amber">{missing_pct:.1f}%</b></div>
-    <div class="small-label">총 {total_count}개 핵심 today/history feature 상태 기준</div>
+    <div class="panel-title">{svg_icon("puzzle-svgrepo-com.svg", "nav-icon", "#8B5CF6")} 특성 완성도</div>
+    <div class="feature-row"><div class="feature-label">직접 관측 / 입력</div><div class="feature-progress"><div class="bar"><span style="width: {direct_pct:.1f}%; background: var(--primary);"></span></div></div><b>{direct_count}</b></div>
+    <div class="feature-row"><div class="feature-label">결측치 보완</div><div class="feature-progress"><div class="bar"><span style="width: {missing_pct:.1f}%; background: var(--sleep-purple);"></span></div></div><b>{missing_count}</b></div>
+    <div class="feature-row"><div class="feature-label">결측 비율</div><div class="feature-progress"><div class="bar"><span style="width: {missing_pct:.1f}%; background: var(--warning);"></span></div></div><b class="accent-amber">{missing_pct:.1f}%</b></div>
+    <div class="small-label">총 {total_count}개 핵심 오늘/이력 특성 상태 기준</div>
   </div>
 
   <div class="panel-card">
-    <div class="panel-title">Good Sleep Probability</div>
+    <div class="panel-title">좋은 수면 확률</div>
     <div class="compact-ring-row">
       <div>
         <div class="probability-value">{probability_pct}</div>
@@ -3020,15 +3270,15 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
       </div>
       <div class="sleep-ring" style="--p: {ring_pct:.1f}%"><span>{svg_icon("night-svgrepo-com.svg", color="#C4B5FD")}</span></div>
     </div>
-    <div class="status-item" style="margin-top: 1rem;"><span>{svg_icon("shield-alt-svgrepo-com.svg", color="#F59E0B")}</span><span>Interpretation reliability</span><b>{label_text}</b></div>
+    <div class="status-item" style="margin-top: 1rem;"><span>{svg_icon("shield-alt-svgrepo-com.svg", color="#F59E0B")}</span><span>해석 신뢰도</span><b>{label_text}</b></div>
   </div>
 
   <div class="panel-card">
-    <div class="panel-title">Input Summary</div>
+    <div class="panel-title">입력 요약</div>
     <div class="summary-row"><span>{svg_icon("clock-five-svgrepo-com.svg", "nav-icon", "#818CF8")} 예측 대상</span><b>{format_prediction_target(target)}</b></div>
-    <div class="summary-row"><span>{svg_icon("shield-check-svgrepo-com.svg", "nav-icon", "#22C55E")} 예측 label</span><b>{label_text}</b></div>
-    <div class="summary-row"><span>{svg_icon("scales-svgrepo-com.svg", "nav-icon", "#F59E0B")} threshold</span><b>{threshold:.2f}</b></div>
-    <div class="summary-row"><span>{svg_icon("database-02-svgrepo-com.svg", "nav-icon", "#38BDF8")} raw feature 파일</span><b>{"있음" if not raw_feature_df.empty else "없음"}</b></div>
+    <div class="summary-row"><span>{svg_icon("shield-check-svgrepo-com.svg", "nav-icon", "#22C55E")} 예측 라벨</span><b>{label_text}</b></div>
+    <div class="summary-row"><span>{svg_icon("scales-svgrepo-com.svg", "nav-icon", "#F59E0B")} 기준값</span><b>{threshold:.2f}</b></div>
+    <div class="summary-row"><span>{svg_icon("database-02-svgrepo-com.svg", "nav-icon", "#38BDF8")} 원본 특성 파일</span><b>{"있음" if not raw_feature_df.empty else "없음"}</b></div>
     <div class="small-label">{forecast_sentence(target, probability, pred)}</div>
   </div>
 </div>
@@ -3047,39 +3297,60 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
         render_html(
             f"""
 <div class="today-stat-grid">
-  <div class="today-stat-card"><div class="today-stat-label">Samsung-only</div><div class="today-stat-value">{samsung_only_prob:.3f}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">Samsung 단독</div><div class="today-stat-value">{samsung_only_prob:.3f}</div></div>
   <div class="today-stat-card"><div class="today-stat-label">최종 예측</div><div class="today-stat-value">{final_prob:.3f}</div><div class="today-stat-delta">{format_delta(supplement_delta)}</div></div>
-  <div class="today-stat-card"><div class="today-stat-label">label 변화</div><div class="today-stat-value">{"변화 있음" if label_changed else "변화 없음"}</div></div>
-  <div class="today-stat-card"><div class="today-stat-label">이전 snapshot 대비</div><div class="today-stat-value">{format_delta(snapshot_delta_value)}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">라벨 변화</div><div class="today-stat-value">{"변화 있음" if label_changed else "변화 없음"}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">이전 스냅샷 대비</div><div class="today-stat-value">{format_delta(snapshot_delta_value)}</div></div>
 </div>
 """
         )
-        with st.expander("Samsung-only vs 최종 예측 비교", expanded=False):
-            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+        with st.expander("Samsung 단독 vs 최종 예측 비교", expanded=False):
+            comparison_display = comparison_df.rename(
+                columns={
+                    "sleep_start_datetime": "예측 대상",
+                    "samsung_only_probability": "Samsung 단독 확률",
+                    "final_probability": "최종 확률",
+                    "probability_delta": "확률 변화",
+                    "samsung_only_pred": "Samsung 단독 라벨",
+                    "final_pred": "최종 라벨",
+                    "label_changed": "라벨 변화",
+                    "manual_supplement_applied": "수동 보완 적용",
+                    "sleep_episode_id": "수면 에피소드 ID",
+                }
+            )
+            st.dataframe(comparison_display, use_container_width=True, hide_index=True)
 
     st.subheader("반영된 최신 데이터 상태")
     render_html(
         f"""
 <div class="today-stat-grid">
-  <div class="today-stat-card"><div class="today-stat-label">이력/baseline 반영</div><div class="today-stat-value">{coverage_summary['history_present']} / {coverage_summary['history_total']}</div></div>
-  <div class="today-stat-card"><div class="today-stat-label">오늘 wearable 반영</div><div class="today-stat-value">{coverage_summary['current_present']} / {coverage_summary['current_total']}</div></div>
-  <div class="today-stat-card"><div class="today-stat-label">raw feature 파일</div><div class="today-stat-value">{"있음" if not raw_feature_df.empty else "없음"}</div></div>
-  <div class="today-stat-card"><div class="today-stat-label">imputer 사용</div><div class="today-stat-value">{"예" if coverage_summary["current_present"] < coverage_summary["current_total"] else "최소"}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">이력 기준 반영</div><div class="today-stat-value">{coverage_summary['history_present']} / {coverage_summary['history_total']}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">오늘 웨어러블 반영</div><div class="today-stat-value">{coverage_summary['current_present']} / {coverage_summary['current_total']}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">원본 특성 파일</div><div class="today-stat-value">{"있음" if not raw_feature_df.empty else "없음"}</div></div>
+  <div class="today-stat-card"><div class="today-stat-label">결측치 보완 사용</div><div class="today-stat-value">{"예" if coverage_summary["current_present"] < coverage_summary["current_total"] else "최소"}</div></div>
 </div>
 """
     )
 
     if not coverage_df.empty:
         current_missing = coverage_df[
-            (coverage_df["feature_group"] == "오늘 현재 wearable") & (coverage_df["status"] != "반영됨")
+            (coverage_df["feature_group"] == "오늘 현재 웨어러블") & (coverage_df["status"] != "반영됨")
         ]
         if not current_missing.empty:
             st.warning(
                 "현재 Samsung export에서 오늘 intraday step/heart-rate 일부가 비어 있습니다. "
-                "해당 feature는 기존 학습-time imputer와 missing indicator를 통해 처리됩니다."
+                "해당 특성은 기존 학습 시점의 결측치 보완값과 결측 표시값을 통해 처리됩니다."
             )
+        coverage_display = coverage_df[["feature_group", "display_name", "status", "value"]].rename(
+            columns={
+                "feature_group": "특성 그룹",
+                "display_name": "표시 이름",
+                "status": "상태",
+                "value": "값",
+            }
+        )
         st.dataframe(
-            coverage_df[["feature_group", "display_name", "status", "value"]],
+            coverage_display,
             use_container_width=True,
             hide_index=True,
         )
@@ -3087,16 +3358,24 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
     supplement_report_df = load_csv_if_exists(TODAY_SUPPLEMENT_REPORT_PATH)
     if not supplement_report_df.empty:
         with st.expander("수동 wearable 보완 적용 내역", expanded=False):
-            st.dataframe(supplement_report_df, use_container_width=True, hide_index=True)
+            supplement_display = supplement_report_df.rename(
+                columns={
+                    "feature": "특성",
+                    "old_value": "기존 값",
+                    "new_value": "보완 값",
+                    "source": "출처",
+                }
+            )
+            st.dataframe(supplement_display, use_container_width=True, hide_index=True)
 
-    st.subheader("Numeric sensitivity")
-    st.caption("현재 today raw feature row를 기준으로 걸음, 심박, 취침시각을 일부 바꿔 최종 MLP 점수 변화를 확인합니다.")
-    if st.button("Numeric sensitivity 생성", type="secondary"):
+    st.subheader("수치 민감도")
+    st.caption("현재 오늘 원본 특성 행을 기준으로 걸음, 심박, 취침시각을 일부 바꿔 최종 MLP 점수 변화를 확인합니다.")
+    if st.button("수치 민감도 생성", type="secondary"):
         sensitivity_df = run_numeric_sensitivity()
         if sensitivity_df.empty:
-            st.warning("sensitivity를 생성할 raw feature가 없습니다.")
+            st.warning("수치 민감도를 생성할 원본 특성이 없습니다.")
         else:
-            st.success(f"numeric sensitivity 저장: {TODAY_NUMERIC_SENSITIVITY_PATH}")
+            st.success(f"수치 민감도 저장: {TODAY_NUMERIC_SENSITIVITY_PATH}")
 
     sensitivity_df = load_csv_if_exists(TODAY_NUMERIC_SENSITIVITY_PATH)
     if not sensitivity_df.empty:
@@ -3104,7 +3383,21 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
         display_sensitivity["probability_delta"] = pd.to_numeric(
             display_sensitivity["probability_delta"], errors="coerce"
         )
-        st.dataframe(display_sensitivity, use_container_width=True, hide_index=True)
+        st.dataframe(
+            display_sensitivity.rename(
+                columns={
+                    "scenario_id": "시나리오 ID",
+                    "description": "설명",
+                    "sleep_start_datetime": "예측 대상",
+                    "good_sleep_probability": "좋은 수면 확률",
+                    "probability_delta": "확률 변화",
+                    "good_sleep_pred": "예측 라벨",
+                    "label_changed": "라벨 변화",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
         chart_df = display_sensitivity[["description", "good_sleep_probability"]].copy()
         chart_df["good_sleep_probability"] = pd.to_numeric(chart_df["good_sleep_probability"], errors="coerce")
         chart_df = chart_df.dropna(subset=["good_sleep_probability"])
@@ -3120,10 +3413,10 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
                 ),
                 y=alt.Y(
                     "good_sleep_probability:Q",
-                    title="good_sleep_probability",
+                    title="좋은 수면 확률",
                     scale=alt.Scale(domain=[0, 1]),
                 ),
-                tooltip=["description:N", alt.Tooltip("good_sleep_probability:Q", format=".3f")],
+                tooltip=[alt.Tooltip("description:N", title="설명"), alt.Tooltip("good_sleep_probability:Q", title="좋은 수면 확률", format=".3f")],
             )
             .properties(height=260)
             .configure_view(strokeWidth=0)
@@ -3140,7 +3433,19 @@ def render_today_forecast_result(prediction_df: pd.DataFrame) -> None:
         "good_sleep_pred",
         "threshold",
     ]
-    st.dataframe(display[display_cols], use_container_width=True, hide_index=True)
+    st.dataframe(
+        display[display_cols].rename(
+            columns={
+                "prediction_target": "예측 대상",
+                "sleep_episode_id": "수면 에피소드 ID",
+                "good_sleep_probability": "좋은 수면 확률",
+                "good_sleep_pred": "예측 라벨",
+                "threshold": "기준값",
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
 
     with st.expander("오늘 밤 예측 산출물", expanded=False):
         st.code(
@@ -3172,40 +3477,40 @@ def render_today_forecast_tab(data_dir: Path, run_today_clicked: bool, target_sl
         f"""
 <div class="live-page">
   <div class="live-hero">
-    <h2>Live Prediction <span class="live-badge">{svg_icon("cardiogram-svgrepo-com.svg", "nav-icon", "#38BDF8")} LIVE</span></h2>
-    <p>Samsung Health export 또는 일부 입력 기반 예측 실행</p>
+    <h2>실시간 예측 <span class="live-badge">{svg_icon("cardiogram-svgrepo-com.svg", "nav-icon", "#38BDF8")} 실시간</span></h2>
+    <p>Samsung Health 내보내기 또는 일부 입력 기반 예측 실행</p>
     <p>오늘 밤의 수면 결과를 실시간으로 예측합니다. 입력 모드에 따라 일부 값이 추정될 수 있습니다.</p>
   </div>
 
   <div class="live-top-grid">
     <div class="live-section-card">
-      <div class="live-section-title"><span class="step-badge">1</span> Samsung Health Export Mode</div>
+      <div class="live-section-title"><span class="step-badge">1</span> Samsung Health 내보내기 모드</div>
       <div class="export-grid">
         <div>
           <div class="status-item">
             <span class="accent-blue">{svg_icon("folder-alt-svgrepo-com.svg", color="#38BDF8")}</span>
-            <span>Samsung Health Export Folder</span>
+            <span>Samsung Health 내보내기 폴더</span>
             <b>연결됨</b>
           </div>
           <div class="small-label" style="margin-top: .75rem;">{data_dir}</div>
           <div class="live-flow" style="margin-top: 1rem;">
-            Samsung Health 최신 export<br>
+            Samsung Health 최신 내보내기<br>
             → 완료 수면 episode 갱신<br>
-            → today target feature 생성<br>
-            → fixed MLP inference
+            → 오늘 예측 대상 특성 생성<br>
+            → 고정 MLP 예측
           </div>
         </div>
         <div class="status-list">
-          <div class="status-item"><span class="accent-green">{svg_icon("check-circle-1-svgrepo-com.svg", color="#22C55E")}</span><span>Samsung files detected</span><b>{file_counts['total']:,}</b></div>
+          <div class="status-item"><span class="accent-green">{svg_icon("check-circle-1-svgrepo-com.svg", color="#22C55E")}</span><span>감지된 Samsung 파일</span><b>{file_counts['total']:,}</b></div>
           <div class="status-item"><span>{svg_icon("database-02-svgrepo-com.svg", color="#38BDF8")}</span><span>감지 데이터셋</span><b>{freshness_summary['available']} / {freshness_summary['total']}</b></div>
-          <div class="status-item"><span class="accent-purple">{svg_icon("clock-svgrepo-com.svg", color="#8B5CF6")}</span><span>Latest dataset</span><b>{latest_dataset}</b></div>
-          <div class="status-item"><span class="accent-green">{svg_icon("shield-check-svgrepo-com.svg", color="#22C55E")}</span><span>Inference status</span><b>Ready</b></div>
+          <div class="status-item"><span class="accent-purple">{svg_icon("clock-svgrepo-com.svg", color="#8B5CF6")}</span><span>최신 데이터셋</span><b>{latest_dataset}</b></div>
+          <div class="status-item"><span class="accent-green">{svg_icon("shield-check-svgrepo-com.svg", color="#22C55E")}</span><span>예측 상태</span><b>준비 완료</b></div>
         </div>
       </div>
     </div>
 
     <div class="live-section-card">
-      <div class="live-section-title"><span class="step-badge">2</span> Partial Manual Input</div>
+      <div class="live-section-title"><span class="step-badge">2</span> 일부 수동 입력</div>
       <div class="manual-preview-grid">
         <div class="mini-input-card"><div class="mini-input-top">{svg_icon("clock-five-svgrepo-com.svg", "nav-icon", "#818CF8")}<div class="mini-input-label">예상 취침 시간</div></div><div class="mini-input-value">{input_summary["target_sleep"]}</div></div>
         <div class="mini-input-card"><div class="mini-input-top">{svg_icon("bed-2-svgrepo-com.svg", "nav-icon", "#8B5CF6")}<div class="mini-input-label">평균 수면 패턴</div></div><div class="mini-input-value">보통</div></div>
@@ -3214,14 +3519,14 @@ def render_today_forecast_tab(data_dir: Path, run_today_clicked: bool, target_sl
         <div class="mini-input-card"><div class="mini-input-top">{svg_icon("fire-svgrepo-com.svg", "nav-icon", "#F59E0B")}<div class="mini-input-label">칼로리 입력</div></div><div class="mini-input-value">{input_summary["calories"]}</div></div>
         <div class="mini-input-card"><div class="mini-input-top">{svg_icon("heart-rate-svgrepo-com.svg", "nav-icon", "#EF4444")}<div class="mini-input-label">휴식 시 심박</div></div><div class="mini-input-value">{input_summary["resting_hr"]}</div></div>
       </div>
-      <div class="small-label" style="margin-top: 1rem;">Samsung export에 오늘 intraday 값이 부족하면 아래 보완 입력을 사용합니다.</div>
+      <div class="small-label" style="margin-top: 1rem;">Samsung 내보내기에 오늘의 시간대별 값이 부족하면 아래 보완 입력을 사용합니다.</div>
     </div>
   </div>
 </div>
 """
     )
 
-    with st.expander("Samsung 데이터 freshness 진단", expanded=False):
+    with st.expander("Samsung 데이터 최신성 진단", expanded=False):
         st.dataframe(
             freshness_df[["데이터", "상태", "최신 데이터 시각", "행 수", "시간 컬럼", "파일 수정 시각"]],
             use_container_width=True,
@@ -3232,14 +3537,14 @@ def render_today_forecast_tab(data_dir: Path, run_today_clicked: bool, target_sl
         f"""
 <div class="manual-widget-shell">
   <div class="live-section-title">{svg_icon("smartwatch-svgrepo-com.svg", "nav-icon", "#38BDF8")} 오늘 wearable 보완 입력</div>
-  <div class="small-label">아래 입력은 모델 재학습이 아니라 오늘 밤 inference용 raw feature 보완값으로만 기록됩니다.</div>
+  <div class="small-label">아래 입력은 모델 재학습이 아니라 오늘 밤 예측용 원본 특성 보완값으로만 기록됩니다.</div>
 </div>
 """
     )
     use_manual_supplement = st.checkbox(
         "Samsung export에 오늘 intraday 값이 부족하면 아래 입력으로 보완",
         value=False,
-        help="이 값은 모델 재학습이 아니라 오늘 밤 inference용 raw feature 보완값입니다.",
+        help="이 값은 모델 재학습이 아니라 오늘 밤 예측용 원본 특성 보완값입니다.",
     )
     manual_supplement = None
     if use_manual_supplement:
@@ -3260,7 +3565,7 @@ def render_today_forecast_tab(data_dir: Path, run_today_clicked: bool, target_sl
             last_3h_heart_rate=last_3h_heart_rate,
             last_1h_heart_rate=last_1h_heart_rate,
         )
-        st.caption("칼로리 feature는 걸음 수 기반 보조 추정값으로 함께 채웁니다. 원천 Samsung 데이터가 아니라 manual supplement로 기록됩니다.")
+        st.caption("칼로리 특성은 걸음 수 기반 보조 추정값으로 함께 채웁니다. 원천 Samsung 데이터가 아니라 수동 보완값으로 기록됩니다.")
 
     if run_today_clicked:
         if not data_dir.exists():

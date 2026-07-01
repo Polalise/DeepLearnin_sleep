@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 
-PROJECT_ROOT = Path(r"C:\workSpace\DeepLearnin_sleep")
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
 
 SAMSUNG_DIR_CANDIDATES = [
     Path(os.environ["SAMSUNG_HEALTH_DIR"]) if os.environ.get("SAMSUNG_HEALTH_DIR") else None,

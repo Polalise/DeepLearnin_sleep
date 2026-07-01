@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import pandas as pd
 import numpy as np
 
 
-PROJECT_ROOT = Path(r"C:\workSpace\DeepLearnin_sleep")
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
 
 STAGE1_DIR = PROJECT_ROOT / "data" / "processed" / "samsung_health" / "pre_sleep_stage1"
 

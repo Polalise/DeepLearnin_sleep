@@ -1,2 +1,2 @@
 ﻿sleep_episode_id,sleep_start_datetime,prediction_cutoff_datetime,samsung_only_probability,final_probability,probability_delta,samsung_only_pred,final_pred,label_changed,manual_supplement_applied
-today_forecast__20260630233000,2026-06-30 23:30:00,2026-06-30 08:17:08,0.41335535,0.6078624,0.19450705000000001,0,1,True,True
+today_forecast__20260701233000,2026-07-01 23:30:00,2026-07-01 15:44:56,0.22738516,0.22738516,0.0,0,0,False,False

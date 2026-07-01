@@ -4,7 +4,6 @@ __pycache__
 *.pyc
 .streamlit/secrets.toml
 _upload_work
-.gcloudignore
 data/*
 !data/processed/
 data/processed/*

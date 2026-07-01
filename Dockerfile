@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements-cloudrun.txt \
     && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
 
 COPY . .
+
+RUN mkdir -p /app/reports /app/data/processed/samsung_health/pre_sleep_stage1
 
 EXPOSE 8080
 

@@ -28,18 +28,18 @@ data\processed\samsung_health\pre_sleep_stage1\live_forecast\today_sleep_forecas
 
 - Rows: `1`
 - Threshold: `0.5400`
-- Predicted positive rate: `1.0000`
-- Mean probability: `0.6079`
-- Median probability: `0.6079`
-- P10/P90 probability: `0.6079` / `0.6079`
+- Predicted positive rate: `0.0000`
+- Mean probability: `0.2274`
+- Median probability: `0.2274`
+- P10/P90 probability: `0.2274` / `0.2274`
 
 ## Highest Probability Episodes
 
-- `2026-06-30 23:30:00` | pred=1 | probability=0.6079 | `today_forecast__20260630233000`
+- `2026-07-01 23:30:00` | pred=0 | probability=0.2274 | `today_forecast__20260701233000`
 
 ## Lowest Probability Episodes
 
-- `2026-06-30 23:30:00` | pred=1 | probability=0.6079 | `today_forecast__20260630233000`
+- `2026-07-01 23:30:00` | pred=0 | probability=0.2274 | `today_forecast__20260701233000`
 
 ## Interpretation Caveats
 

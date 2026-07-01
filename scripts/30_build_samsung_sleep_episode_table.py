@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 
-PROJECT_ROOT = Path(r"C:\workSpace\DeepLearnin_sleep")
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
 
 SAMSUNG_DIR_CANDIDATES = [
     Path(os.environ["SAMSUNG_HEALTH_DIR"]) if os.environ.get("SAMSUNG_HEALTH_DIR") else None,
@@ -32,6 +32,13 @@ PARTICIPANT_ID = "samsung_user"
 
 MIN_SLEEP_DURATION_HOURS = 2.0
 MAX_SLEEP_DURATION_HOURS = 16.0
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def find_dataset_file(dataset_name: str) -> Path:
@@ -257,7 +264,7 @@ def main() -> None:
     stage_summary_df.to_csv(STAGE_SUMMARY_PATH, index=False, encoding="utf-8-sig")
 
     summary_rows = [
-        {"metric": "source_file", "value": str(sleep_stage_path.relative_to(PROJECT_ROOT))},
+        {"metric": "source_file", "value": display_path(sleep_stage_path)},
         {"metric": "source_stage_rows", "value": len(stage_df)},
         {"metric": "valid_stage_rows", "value": len(valid_stage_df)},
         {"metric": "raw_episode_count", "value": int(valid_stage_df["source_sleep_id"].nunique())},
@@ -302,7 +309,7 @@ def main() -> None:
         "## Source",
         "",
         "```text",
-        str(sleep_stage_path.relative_to(PROJECT_ROOT)),
+        display_path(sleep_stage_path),
         "```",
         "",
         "## Output",
@@ -348,6 +355,7 @@ def main() -> None:
         ]
     )
 
+    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text("\n".join(report_lines), encoding="utf-8")
 
     print("output:", OUTPUT_PATH)

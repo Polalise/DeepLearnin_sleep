@@ -1,6 +1,7 @@
 from pathlib import Path
 import argparse
 import json
+import os
 
 import numpy as np
 import pandas as pd
@@ -330,7 +331,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", required=True, help="CSV with participant_object_id and sleep_start_datetime.")
     parser.add_argument("--output", required=True, help="Output CSV for 70 raw Stage 1 features.")
-    parser.add_argument("--project-root", default=r"C:\workSpace\DeepLearnin_sleep")
+    parser.add_argument("--project-root", default=str(Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[2]))))
     parser.add_argument(
         "--manifest",
         default=None,

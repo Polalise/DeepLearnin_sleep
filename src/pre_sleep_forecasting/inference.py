@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import argparse
 import json
 
@@ -59,11 +59,24 @@ class PreSleepInferencePipeline:
         self.threshold = float(self.manifest["official_threshold"])
 
         artifact_paths = self.manifest["artifact_paths"]
-        self.imputer = joblib.load(self.project_root / artifact_paths["imputer"])
-        self.scaler = joblib.load(self.project_root / artifact_paths["scaler"])
+        imputer_path = self._artifact_path(artifact_paths["imputer"])
+        scaler_path = self._artifact_path(artifact_paths["scaler"])
+        checkpoint_path = self._artifact_path(artifact_paths["model_checkpoint"])
+        missing_artifacts = [
+            path for path in [imputer_path, scaler_path, checkpoint_path]
+            if not path.exists()
+        ]
+        if missing_artifacts:
+            missing_text = "\n".join(str(path) for path in missing_artifacts)
+            raise FileNotFoundError(f"Missing inference artifact(s):\n{missing_text}")
 
-        checkpoint_path = self.project_root / artifact_paths["model_checkpoint"]
-        self.checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        self.imputer = joblib.load(imputer_path)
+        self.scaler = joblib.load(scaler_path)
+
+        try:
+            self.checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+        except TypeError:
+            self.checkpoint = torch.load(checkpoint_path, map_location=self.device)
 
         self.model = PreSleepMLP(
             input_dim=int(self.checkpoint["input_dim"]),
@@ -75,6 +88,14 @@ class PreSleepInferencePipeline:
         self.model.eval()
 
         self._validate_contract()
+
+    def _artifact_path(self, relative_path):
+        relative_text = str(relative_path)
+        if "\\" in relative_text:
+            relative = Path(*PureWindowsPath(relative_text).parts)
+        else:
+            relative = Path(relative_text)
+        return self.project_root / relative
 
     def _validate_contract(self):
         computed_final = [

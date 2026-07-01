@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 import argparse
+import os
 import sys
 
 import pandas as pd
 
 
-PROJECT_ROOT = Path(r"C:\workSpace\DeepLearnin_sleep")
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
 SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
