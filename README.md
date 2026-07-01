@@ -1,25 +1,26 @@
 # DeepLearnin Sleep
 
-Strict pre-sleep forecasting project for predicting the upcoming sleep episode `good_sleep_label` using only data available before `sleep_start_datetime`.
+`sleep_start_datetime` 이전에 이용 가능한 데이터만 사용해 다가오는 수면 episode의 `good_sleep_label`을 예측하는 엄격한 pre-sleep forecasting 프로젝트입니다.
 
-## Final Objective
+## 최종 목표
 
 ```text
-Predict whether the upcoming sleep episode will be good sleep using prior sleep/wearable history and wearable data observed before sleep start.
+이전 수면/웨어러블 이력과 수면 시작 전까지 관측된 웨어러블 데이터를 이용해,
+다가오는 수면 episode가 좋은 수면인지 예측합니다.
 ```
 
-The final workflow avoids using information from after sleep onset or after sleep completion.
+최종 workflow는 수면 시작 이후 또는 수면 완료 이후의 정보를 사용하지 않도록 설계되어 있습니다.
 
-## Final Model
+## 최종 모델
 
-- Experiment family: `presleep_stage1_hp_tiny_dropout40_wd1e3`
-- Representative checkpoint: `presleep_stage1_hp_tiny_dropout40_wd1e3_seed2027`
-- Feature set: Design C Stage 1 strict pre-sleep features
-- Model: PyTorch MLP
+- 실험군: `presleep_stage1_hp_tiny_dropout40_wd1e3`
+- 대표 checkpoint: `presleep_stage1_hp_tiny_dropout40_wd1e3_seed2027`
+- 특성 세트: Design C Stage 1 strict pre-sleep features
+- 모델: PyTorch MLP
 - Hidden dimensions: `(24, 12)`
 - Dropout: `0.40`
 - Weight decay: `0.001`
-- Official threshold: `0.54`
+- 공식 threshold: `0.54`
 
 Checkpoint:
 
@@ -27,9 +28,9 @@ Checkpoint:
 data/processed/pre_sleep_forecasting/design_c_stage1/experiments/stage1_hyperparameter_stability_outputs/models/presleep_stage1_hp_tiny_dropout40_wd1e3_seed2027_best.pt
 ```
 
-## Performance Reference
+## 성능 참고 지표
 
-Representative held-out participant test performance:
+대표 held-out participant test 성능:
 
 - Balanced accuracy: `0.6492`
 - ROC AUC: `0.6937`
@@ -40,13 +41,13 @@ Representative held-out participant test performance:
 - Brier score: `0.2126`
 - Expected calibration error: `0.1256`
 
-Interpretation:
+해석:
 
-- The model shows moderate predictive signal under a strict pre-sleep timing definition.
-- Probability output should be treated as a model score, not a perfectly calibrated real-world probability.
-- The model is not intended for clinical, medical, or high-stakes decisions.
+- 이 모델은 엄격한 pre-sleep timing 정의 아래에서 중간 수준의 예측 신호를 보입니다.
+- 확률 출력은 완벽히 보정된 현실 확률이 아니라 모델 점수로 해석해야 합니다.
+- 이 모델은 임상, 의료, 고위험 의사결정 용도로 사용하기 위한 것이 아닙니다.
 
-## Inference Contract
+## 추론 계약
 
 ```text
 raw Stage 1 features 70
@@ -59,7 +60,7 @@ raw Stage 1 features 70
 -> threshold 0.54
 ```
 
-Core files:
+핵심 파일:
 
 ```text
 src/pre_sleep_forecasting/feature_builder.py
@@ -68,16 +69,16 @@ data/processed/pre_sleep_forecasting/design_c_stage1/inference_package/pre_sleep
 data/processed/pre_sleep_forecasting/design_c_stage1/inference_package/pre_sleep_inference_feature_contract.csv
 ```
 
-## Predict New Episodes
+## 새 episode 예측
 
-Input episode CSV requires:
+입력 episode CSV에는 다음 컬럼이 필요합니다.
 
 ```text
 participant_object_id
 sleep_start_datetime
 ```
 
-Optional:
+선택 컬럼:
 
 ```text
 sleep_episode_id
@@ -98,7 +99,7 @@ python src\pre_sleep_forecasting\inference.py `
   --output data\processed\pre_sleep_forecasting\new_data\predictions.csv
 ```
 
-Prediction output columns:
+예측 결과 컬럼:
 
 ```text
 sleep_episode_id
@@ -110,11 +111,11 @@ good_sleep_pred
 threshold
 ```
 
-## Samsung Health Diagnostic
+## Samsung Health 진단
 
-Samsung Health data were transformed into a Fitbit-compatible feature schema for cross-device transfer diagnostics.
+Samsung Health 데이터는 cross-device transfer 진단을 위해 Fitbit 호환 특성 schema로 변환되었습니다.
 
-This does not mean Samsung raw data were converted into Fitbit raw data, and it is not formal external validation.
+이는 Samsung 원천 데이터가 Fitbit 원천 데이터로 변환되었다는 뜻이 아니며, 공식적인 외부 검증도 아닙니다.
 
 Samsung workflow:
 
@@ -129,15 +130,15 @@ scripts/35_evaluate_samsung_predictions_against_stage_proxy_labels.py
 scripts/36_diagnose_samsung_presleep_activity_coverage.py
 ```
 
-Main Samsung conclusion:
+Samsung 진단의 주요 결론:
 
-- The adapter can produce a 70-feature Fitbit-compatible Stage 1 table.
-- Pre-sleep heart-rate and previous-day daily activity features are usable.
-- Pre-sleep step/calorie interval data are sparse in the current export.
-- Samsung proxy labels do not provide formal external validation.
-- The selected Fitbit-trained MLP does not transfer reliably to Samsung stage-proxy labels.
+- adapter는 70개 특성의 Fitbit 호환 Stage 1 테이블을 생성할 수 있습니다.
+- 수면 전 심박과 전날 daily activity 특성은 사용할 수 있습니다.
+- 현재 export에서는 수면 전 step/calorie interval 데이터가 희소합니다.
+- Samsung proxy label은 공식 외부 검증으로 볼 수 없습니다.
+- 선택된 Fitbit 학습 MLP는 Samsung stage-proxy label에 안정적으로 전이되지 않습니다.
 
-Key Samsung reports:
+주요 Samsung report:
 
 ```text
 reports/samsung_pre_sleep_external_prediction_interpretation.md
@@ -147,9 +148,9 @@ reports/samsung_to_fitbit_adapter_high_priority_improvements.md
 reports/samsung_presleep_activity_coverage_diagnostic.md
 ```
 
-## Raw Feature Inference Debug Tool
+## Raw Feature 추론 디버그 도구
 
-A lightweight Streamlit debug tool is available for running the selected inference pipeline on already-built raw Stage 1 feature CSV files.
+이미 생성된 raw Stage 1 feature CSV 파일에 대해 선택된 inference pipeline을 실행할 수 있는 경량 Streamlit 디버그 도구가 있습니다.
 
 Debug app:
 
@@ -157,7 +158,7 @@ Debug app:
 prototype/pre_sleep_inference_app.py
 ```
 
-Run:
+실행:
 
 ```powershell
 cd C:\workSpace\DeepLearnin_sleep
@@ -165,17 +166,17 @@ cd C:\workSpace\DeepLearnin_sleep
 .\.venv\Scripts\python.exe -m streamlit run prototype\pre_sleep_inference_app.py
 ```
 
-Debug tool usage guide:
+Debug tool 사용 가이드:
 
 ```text
 docs/pre_sleep_prototype_usage.md
 ```
 
-This is not the end-to-end Samsung live forecasting prototype. It does not read Samsung Health export folders or build features from raw wearable files.
+이 도구는 end-to-end Samsung live forecasting prototype이 아닙니다. Samsung Health export 폴더를 읽거나 원천 wearable 파일에서 특성을 생성하지 않습니다.
 
 ## Samsung Live Forecasting Prototype
 
-The Samsung live prototype runs the end-to-end diagnostic workflow from a Samsung Health export folder through the final trained MLP. It also includes a partial-input preset mode for fast prototype interaction.
+Samsung live prototype은 Samsung Health export 폴더에서 시작해 최종 학습 MLP까지 이어지는 end-to-end 진단 workflow를 실행합니다. 빠른 프로토타입 상호작용을 위한 일부 입력 프리셋 모드도 포함합니다.
 
 App:
 
@@ -183,7 +184,7 @@ App:
 prototype/samsung_sleep_forecasting_app.py
 ```
 
-Run:
+실행:
 
 ```powershell
 cd C:\workSpace\DeepLearnin_sleep
@@ -191,13 +192,13 @@ cd C:\workSpace\DeepLearnin_sleep
 .\.venv\Scripts\python.exe -m streamlit run prototype\samsung_sleep_forecasting_app.py
 ```
 
-Default data source:
+기본 데이터 소스:
 
 ```text
 docs/samsunghealth
 ```
 
-Usage guide:
+사용 가이드:
 
 ```text
 docs/samsung_sleep_live_prototype_usage.md
@@ -213,32 +214,32 @@ Samsung Health export
 -> prediction trend and latest results
 ```
 
-The first screen is a live-style dashboard with:
+첫 화면은 live-style dashboard이며 다음 정보를 보여줍니다.
 
 ```text
-Samsung data availability
-latest prediction target sleep-start time
-plain-language tonight/upcoming-sleep forecast sentence
-latest prediction state
-snapshot probability delta
-recent probability trend
-model/caveat status
+Samsung 데이터 가용성
+최신 예측 대상 수면 시작 시간
+오늘 밤/다음 수면에 대한 자연어 예측 문장
+최신 예측 상태
+스냅샷 확률 변화
+최근 확률 추세
+모델/주의사항 상태
 ```
 
-Main live forecast update:
+주요 live forecast update:
 
 ```text
 오늘 밤 예측 갱신
--> completed Samsung sleep history update
--> target sleep episode for the selected expected sleep-start time
--> latest Samsung wearable feature build
--> existing final MLP inference
--> tonight/upcoming-sleep forecast sentence
+-> 완료된 Samsung 수면 이력 갱신
+-> 선택한 예상 수면 시작 시간의 target sleep episode 생성
+-> 최신 Samsung wearable feature build
+-> 기존 최종 MLP inference
+-> 오늘 밤/다음 수면 예측 문장
 ```
 
-This updates feature history/baseline inputs for inference. It does not retrain the neural network.
+이 과정은 inference를 위한 feature history/baseline 입력을 갱신합니다. 신경망을 재학습하지는 않습니다.
 
-Tonight forecast outputs:
+오늘 밤 예측 산출물:
 
 ```text
 data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_sleep_target_episode.csv
@@ -250,7 +251,7 @@ reports/samsung_today_sleep_forecast_feature_build_summary.md
 reports/samsung_today_sleep_forecast_prediction_summary.md
 ```
 
-The prototype reports which key inputs were actually reflected:
+프로토타입은 어떤 핵심 입력이 실제로 반영되었는지도 보고합니다.
 
 ```text
 history/baseline feature coverage
@@ -258,7 +259,7 @@ current-day wearable feature coverage
 missing current-day features handled by fitted imputer/missing indicators
 ```
 
-It also reports Samsung source freshness by table, so missing current-day features can be traced to export coverage:
+또한 table별 Samsung source freshness를 보고하므로, current-day feature 누락이 export coverage 문제인지 추적할 수 있습니다.
 
 ```text
 sleep stage
@@ -270,7 +271,7 @@ daily activity
 step trend
 ```
 
-When current-day Samsung intraday values are missing, the today forecast flow can optionally apply manual wearable supplements before inference:
+current-day Samsung intraday 값이 없을 때, 오늘 예측 flow는 inference 전에 수동 wearable 보완값을 선택적으로 적용할 수 있습니다.
 
 ```text
 today steps so far
@@ -278,13 +279,13 @@ last 3-hour / last 1-hour steps
 pre-sleep / last 3-hour / last 1-hour heart rate
 ```
 
-Supplement values are recorded separately and do not retrain the model:
+보완값은 별도 파일에 기록되며 모델을 재학습하지 않습니다.
 
 ```text
 data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_manual_wearable_supplement_report.csv
 ```
 
-The app also stores the Samsung-only baseline prediction, final prediction, comparison table, and timestamped snapshots:
+앱은 Samsung-only baseline prediction, final prediction, comparison table, timestamped snapshot도 저장합니다.
 
 ```text
 data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_samsung_only_prediction.csv
@@ -293,15 +294,15 @@ data/processed/samsung_health/pre_sleep_stage1/live_forecast/today_numeric_sensi
 data/processed/samsung_health/pre_sleep_stage1/live_forecast/snapshots/
 ```
 
-Advanced retraining remains separated from live prediction:
+고급 재학습은 live prediction과 분리되어 있습니다.
 
 ```text
 고급 재학습
 -> retraining experiment plan
--> no UI-triggered training by default
+-> 기본적으로 UI에서 학습을 직접 실행하지 않음
 ```
 
-Preset quick prediction flow:
+프리셋 빠른 예측 flow:
 
 ```text
 steps and coarse user presets
@@ -311,9 +312,9 @@ steps and coarse user presets
 -> good_sleep probability
 ```
 
-Preset quick prediction also reports how many raw features came from direct input, derived values, preset estimates, and fitted-imputer completion.
+프리셋 빠른 예측은 raw feature가 직접 입력, 파생값, 프리셋 추정값, fitted-imputer 보완 중 어디에서 왔는지도 집계합니다.
 
-Preset scenario comparison flow:
+프리셋 시나리오 비교 flow:
 
 ```text
 same direct inputs
@@ -322,7 +323,7 @@ same direct inputs
 -> ranked probability comparison
 ```
 
-The scenario screen highlights the highest/lowest probability spread so changes in preset state are visible without reading the raw feature table.
+시나리오 화면은 원본 feature table을 읽지 않아도 preset 상태 변화에 따른 최고/최저 확률 차이를 볼 수 있게 표시합니다.
 
 Preset feature builder:
 
@@ -340,21 +341,21 @@ data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_scenario_com
 data/processed/pre_sleep_forecasting/prototype_outputs/quick_preset_scenario_raw_features.csv
 ```
 
-## Main Reports
+## 주요 보고서
 
-Final project status:
+최종 프로젝트 상태:
 
 ```text
 reports/pre_sleep_forecasting_project_final_status.md
 ```
 
-Final artifact inventory:
+최종 artifact inventory:
 
 ```text
 reports/pre_sleep_final_artifact_inventory.md
 ```
 
-Inference usage guide:
+Inference 사용 가이드:
 
 ```text
 docs/pre_sleep_inference_usage.md
@@ -366,20 +367,20 @@ Inference package QA report:
 reports/pre_sleep_inference_package_qa.md
 ```
 
-Final model report:
+최종 모델 report:
 
 ```text
 reports/pre_sleep_forecasting_stage1_final_report_updated.md
 ```
 
-## Modeling Notes
+## 모델링 메모
 
-- Logistic Regression and Random Forest are traditional ML baseline/reference models only.
-- PCA is exploratory feature-structure analysis only.
-- Sequence models and calibration correction were evaluated as follow-ups; the selected final model remains the Design C Stage 1 MLP.
-- Samsung Health transfer was completed as a cross-device diagnostic and should be reported with strong domain-shift caveats.
+- Logistic Regression과 Random Forest는 전통적 ML baseline/reference model로만 사용됩니다.
+- PCA는 feature structure를 탐색하기 위한 분석입니다.
+- Sequence model과 calibration correction은 후속 실험으로 평가했지만, 최종 선택 모델은 Design C Stage 1 MLP입니다.
+- Samsung Health transfer는 cross-device 진단으로 완료되었으며, 강한 domain-shift caveat와 함께 보고해야 합니다.
 
-## Dependencies
+## 의존성
 
 Inference dependency reference:
 
